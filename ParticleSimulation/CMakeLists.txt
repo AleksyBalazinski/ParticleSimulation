@@ -3,7 +3,7 @@
 #
 
 # Add source to this project's executable.
-add_executable (ParticleSimulation "ParticleSimulation.cpp" "ParticleSimulation.h")
+add_executable (ParticleSimulation "ParticleSimulation.cpp" "RK4Stepper.h")
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET ParticleSimulation PROPERTY CXX_STANDARD 20)
