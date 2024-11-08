@@ -26,7 +26,7 @@ void nBody(StateType& x, StateType& dxdt, double t, const std::vector<double>& m
 
 std::string ppMethod(std::vector<Vec3>& state,
                      std::vector<double>& masses,
-                     const double simLenghtSeconds,
+                     const double simLengthSeconds,
                      const double stepSize,
                      const double G,
                      const char* filepath,
@@ -40,7 +40,7 @@ std::string ppMethod(std::vector<Vec3>& state,
   const double frameLength = 1.0 / frameRate;
   StateRecorder stateRecorder(filepath);
   double curFrameAcc = 0;
-  for (double t = 0; t <= simLenghtSeconds; t += stepSize) {
+  for (double t = 0; t <= simLengthSeconds; t += stepSize) {
     if (curFrameAcc <= 0) {
       stateRecorder.record(state.begin(), state.begin() + n);
       curFrameAcc = frameLength;
