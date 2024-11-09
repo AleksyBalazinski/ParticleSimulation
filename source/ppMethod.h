@@ -11,5 +11,7 @@ std::string ppMethod(std::vector<Vec3>& state,
                      const double simLengthSeconds = 10.0,
                      const double stepSize = 0.001,
                      const double G = 1,
-                     const char* filepath = "output.txt",
-                     const int frameRate = 30);
+                     const int frameRate = 30,
+                     const char* outPath = "output.txt",
+                     const char* energyPath = "energy.txt",
+                     const char* momentumPath = "momentum.txt");

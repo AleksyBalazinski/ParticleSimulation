@@ -28,6 +28,10 @@ double Vec3::getMagnitude() {
   return std::sqrt(x * x + y * y + z * z);
 }
 
+double Vec3::getMagnitudeSquared() {
+  return x * x + y * y + z * z;
+}
+
 std::string Vec3::toString() {
   return std::to_string(x) + ' ' + std::to_string(y) + ' ' + std::to_string(z);
 }

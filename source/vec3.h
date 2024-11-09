@@ -16,6 +16,8 @@ class Vec3 {
 
   double getMagnitude();
 
+  double getMagnitudeSquared();
+
   std::string toString();
 };
 
