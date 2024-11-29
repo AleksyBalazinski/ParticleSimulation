@@ -1,5 +1,6 @@
 #include "ppMethod.h"
 #include <cmath>
+#include "simInfo.h"
 
 Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<double>& masses, double G) {
   const int n = (int)masses.size();
@@ -25,28 +26,15 @@ void nBody(StateType& x, StateType& dxdt, double t, const std::vector<double>& m
   }
 }
 
-double totalEnergy(StateType& x, const std::vector<double>& masses, double G) {
-  const int n = (int)masses.size();
-  double potentialEnergy = 0;
-  double kineticEnergy = 0;
-  for (int i = 0; i < n; i++) {
-    kineticEnergy += 0.5 * masses[i] * x[n + i].getMagnitudeSquared();
-    for (int j = i + 1; j < n; j++) {
-      auto rij = x[i] - x[j];
-      potentialEnergy += (-1) * G * masses[i] * masses[j] / rij.getMagnitude();
-    }
+void setIntegerVelocities(const std::vector<Vec3>& state,
+                          const std::vector<double>& masses,
+                          double G,
+                          double h,
+                          std::vector<Vec3>& intVs) {
+  int n = (int)intVs.size();
+  for (size_t i = 0; i < n; i++) {
+    intVs[i] = state[n + i] + 0.5 * h * acceleration(i, state, masses, G);
   }
-
-  return potentialEnergy + kineticEnergy;
-}
-
-Vec3 totalMomentum(StateType& x, const std::vector<double>& masses) {
-  const int n = (int)masses.size();
-  Vec3 momentum;
-  for (int i = 0; i < n; i++) {
-    momentum += masses[i] * x[n + i];
-  }
-  return momentum;
 }
 
 std::string ppMethod(std::vector<Vec3>& state,
@@ -67,14 +55,36 @@ std::string ppMethod(std::vector<Vec3>& state,
   const double frameLength = 1.0 / frameRate;
   StateRecorder stateRecorder(outPath, energyPath, momentumPath);
   double curFrameAcc = 0;
+
+  // set v_(1/2)
+  // from this point on state[n + i] holds velocities at half-step
+  // for (int i = 0; i < n; i++) {
+  //   state[n + i] += 0.5 * stepSize * acceleration(i, state, masses, G);
+  // }
+  // std::vector<Vec3> velocities(n);  // velocities at integer step (needed only for display)
+
   for (double t = 0; t <= simLengthSeconds; t += stepSize) {
+    // for (int i = 0; i < n; i++) {
+    //   state[i] += stepSize * state[n + i];
+    // }
     if (curFrameAcc <= 0) {
+      // setIntegerVelocities(state, masses, G, stepSize, velocities);
       stateRecorder.recordState(state.begin(), state.begin() + n);
-      stateRecorder.recordTotalEnergy(totalEnergy(state, masses, G));
-      stateRecorder.recordTotalMomentum(totalMomentum(state, masses));
+      // stateRecorder.recordTotalEnergy(totalEnergy(state.begin(), state.begin() + n,
+      //                                             velocities.begin(), velocities.end(), masses,
+      //                                             G));
+      stateRecorder.recordTotalEnergy(
+          totalEnergy(state.begin(), state.begin() + n, state.begin() + n, state.end(), masses, G));
+      // stateRecorder.recordTotalMomentum(
+      //     totalMomentum(velocities.begin(), velocities.end(), masses));
+      stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
       curFrameAcc = frameLength;
     }
     stepper.doStep(state, stepSize);
+    // for (int i = 0; i < n; i++) {
+    //   state[n + i] += stepSize * acceleration(i, state, masses, G);
+    // }
+
     curFrameAcc -= stepSize;
   }
 
