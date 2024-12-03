@@ -7,18 +7,19 @@
 #include "utils.h"
 
 int main() {
-  // auto posRange = std::make_pair(Vec3(0.05, 0.05, 0.05), Vec3(0.1, 0.1, 0.1));
-  // auto vRange = std::make_pair(Vec3(0, 0, 0), Vec3(0.0, 0.0, 0.0));
-  // auto massRange = std::make_pair(20, 30);
+  auto posRange = std::make_pair(Vec3(5.0, 5.0, 5.0), Vec3(20.0, 30.0, 30.0));
+  auto vRange = std::make_pair(Vec3(-1.0, -1.0, -1.0), Vec3(1.0, 1.0, 1.0));
+  auto massRange = std::make_pair(20, 30);
 
-  // const int N = 3;
-  // auto state = randomInitialState(N, posRange, vRange);
-  // auto masses = randomMasses(N, massRange);
-  std::vector<Vec3> state = {Vec3(), Vec3(0.0, 0.0, 0.013), Vec3(), Vec3()};
-  std::vector<double> masses = {500, 200};
+  const int N = 3;
+  auto state = randomInitialState(N, posRange, vRange);
+  auto masses = randomMasses(N, massRange);
 
-  PMMethod pm(state, masses, 32, 0.001, 0.001);
+  PMMethod pm(state, masses, 32, 1, 0.001);
   pm.run(3.0);
+  // ppMethod(state, masses, 3.0);
+
+  // ppMethod(state, masses, 3);
 
   // auto posRange = std::make_pair(Vec3(-10.0, -10.0, -10.0), Vec3(10.0, 10.0, 10.0));
   // auto vRange = std::make_pair(Vec3(-2.0, -2.0, -2.0), Vec3(2.0, 2.0, 0.0));

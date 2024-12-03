@@ -1,5 +1,6 @@
 #include "pmMethod.h"
 #include <kiss_fftnd.h>
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <iostream>
@@ -238,7 +239,8 @@ std::string PMMethod::run(const double simLengthSeconds,
     if (curFrameAcc <= 0) {
       setIntegerVelocities(state, masses, G, 1, accelerations, velocities);
       stateToOriginalUnits(state, n);
-      // TODO: velocities should also be converted but here DT = H, so it wouldn't change anything
+      std::transform(velocities.begin(), velocities.end(), velocities.begin(),
+                     [this](const Vec3& v) { return velocityInOriginalUnits(v); });
       stateRecorder.recordState(state.begin(), state.begin() + n);
       stateRecorder.recordTotalEnergy(totalEnergy(state.begin(), state.begin() + n,
                                                   velocities.begin(), velocities.end(), masses, G));
@@ -247,7 +249,8 @@ std::string PMMethod::run(const double simLengthSeconds,
           totalMomentum(velocities.begin(), velocities.end(), masses));
       curFrameAcc = frameLength;
       stateToCodeUnits(state, n);
-      // TODD: velocties should be converted back to code units
+      std::transform(velocities.begin(), velocities.end(), velocities.begin(),
+                     [this](const Vec3& v) { return velocityInCodeUnits(v); });
     }
     updateAccelerations(G);
     // now that we have accelerations of all particles, we can predict motion
