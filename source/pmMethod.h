@@ -15,37 +15,26 @@ class PMMethod {
   std::vector<Vec3>& state;
   std::vector<double>& masses;
   std::vector<Vec3> accelerations;
+  std::vector<Vec3> velocities;  // velocities at integer step (needed only for display)
 
   int gridPoints;
+  int N;
   double H;
   double DT;
   Grid grid;
 
-  // TODO: this should be stored in the Grid class
-  kiss_fft_cpx* density;
-  kiss_fft_cpx* densityFourier;
-  kiss_fft_cpx* potential;
-  kiss_fft_cpx* potentialFourier;
-
-  kiss_fftnd_cfg cfg;
-  kiss_fftnd_cfg cfgInv;
-
   Vec3 positionInCodeUntits(const Vec3& pos);
   Vec3 velocityInCodeUnits(const Vec3& v);
   double densityToCodeUnits(double density, double G);
-  void stateToCodeUnits(std::vector<Vec3>& state, int n);
+  void stateToCodeUnits();
+  void velocitiesToCodeUnits();
   Vec3 positionInOriginalUnits(const Vec3& pos);
   Vec3 velocityInOriginalUnits(const Vec3& v);
-  void stateToOriginalUnits(std::vector<Vec3>& state, int n);
+  void stateToOriginalUnits();
+  void velocitiesToOriginalUnits();
 
   void reassignDensity(const std::vector<double>& masses, double G);
   Vec3 getFieldAtMeshpoint(double x, double y, double z);
-
-  long mod(long a, long b) { return (a % b + b) % b; }
-
-  int getIndx(int i, int j, int k, int dim) {
-    return mod(i, dim) * dim * dim + mod(j, dim) * dim + mod(k, dim);
-  }
 
   void updateAccelerations(double G);
 
@@ -54,8 +43,10 @@ class PMMethod {
            std::vector<double>& masses,
            int gridPoints,
            double H,
-           double DT);
-  ~PMMethod();
+           double DT);  // TODO: store only the grid stuff in the class, there is no reason to force
+                        // the user to create a new instance just because they want to run a
+                        // different simulation on the same grid
+
   std::string run(const double simLengthSeconds = 10.0,
                   const double G = 1,
                   const int frameRate = 30,

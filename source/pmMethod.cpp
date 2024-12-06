@@ -20,26 +20,21 @@ void PMMethod::updateAccelerations(double G) {
   int nfft = grid.getLength();
   reassignDensity(masses, G);
 
-  for (int i = 0; i < nfft; ++i) {
-    density[i].r = grid.getDensity()[i];
-  }
-
 #ifdef DEBUG
   auto beginFFT1 = std::chrono::steady_clock::now();
 #endif
-  kiss_fftnd(cfg, density, densityFourier);
+  auto densityFourier = grid.fftDensity();
 #ifdef DEBUG
   auto endFFT1 = std::chrono::steady_clock::now();
 #endif
 
   // find potential in Fourier space
   int dim = grid.getGridPoints();
+  grid.setPotentialFourier(0, 0, 0, kiss_fft_cpx(0, 0));
   for (int kx = 0; kx < dim; ++kx) {
     for (int ky = 0; ky < dim; ++ky) {
       for (int kz = 0; kz < dim; ++kz) {
         if (kx == 0 && ky == 0 && kz == 0) {
-          potentialFourier[0].r = 0;
-          potentialFourier[0].i = 0;
           continue;
         }
         auto sx = std::sin(std::numbers::pi * kx / dim);
@@ -47,9 +42,9 @@ void PMMethod::updateAccelerations(double G) {
         auto sz = std::sin(std::numbers::pi * kz / dim);
         double G = -0.25 / (sx * sx + sy * sy + sz * sz);
 
-        int idx = kx * dim * dim + ky * dim + kz;
-        potentialFourier[idx].r = G * densityFourier[idx].r;
-        potentialFourier[idx].i = G * densityFourier[idx].i;
+        auto densityFourier = grid.getDensityFourier(kx, ky, kz);
+        auto potentialFourier = kiss_fft_cpx(G * densityFourier.r, G * densityFourier.i);
+        grid.setPotentialFourier(kx, ky, kz, potentialFourier);
       }
     }
   }
@@ -58,11 +53,7 @@ void PMMethod::updateAccelerations(double G) {
 #ifdef DEBUG
   auto beginFFT2 = std::chrono::steady_clock::now();
 #endif
-  kiss_fftnd(cfgInv, potentialFourier, potential);
-  for (int i = 0; i < nfft; i++) {
-    potential[i].r /= nfft;
-    potential[i].i /= nfft;
-  }
+  auto potential = grid.invFftPotential();
 
 #ifdef DEBUG
   auto endFFT2 = std::chrono::steady_clock::now();
@@ -72,12 +63,9 @@ void PMMethod::updateAccelerations(double G) {
   for (int x = 0; x < dim; ++x) {
     for (int y = 0; y < dim; ++y) {
       for (int z = 0; z < dim; ++z) {
-        auto fieldX = -0.5 * (potential[getIndx(x + 1, y, z, dim)].r -
-                              potential[getIndx(x - 1, y, z, dim)].r);
-        auto fieldY = -0.5 * (potential[getIndx(x, y + 1, z, dim)].r -
-                              potential[getIndx(x, y - 1, z, dim)].r);
-        auto fieldZ = -0.5 * (potential[getIndx(x, y, z + 1, dim)].r -
-                              potential[getIndx(x, y, z - 1, dim)].r);
+        auto fieldX = -0.5 * (grid.getPotential(x + 1, y, z) - grid.getPotential(x - 1, y, z));
+        auto fieldY = -0.5 * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
+        auto fieldZ = -0.5 * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
 
         Vec3 fieldStrength(fieldX, fieldY, fieldZ);
         grid.assignField(x, y, z, fieldStrength);
@@ -111,23 +99,12 @@ PMMethod::PMMethod(std::vector<Vec3>& state,
     : state(state),
       masses(masses),
       accelerations(masses.size()),
+      velocities(masses.size()),
       gridPoints(gridPoints),
+      N(masses.size()),
       H(H),
       DT(DT),
-      grid(gridPoints) {
-  int nfft = grid.getLength();
-
-  density = new kiss_fft_cpx[nfft];
-  densityFourier = new kiss_fft_cpx[nfft];
-
-  potentialFourier = new kiss_fft_cpx[nfft];
-  potential = new kiss_fft_cpx[nfft];
-
-  int dim = grid.getGridPoints();
-  int dims[] = {dim, dim, dim};
-  cfg = kiss_fftnd_alloc(dims, 3, false, nullptr, nullptr);
-  cfgInv = kiss_fftnd_alloc(dims, 3, true, nullptr, nullptr);
-}
+      grid(gridPoints) {}
 
 Vec3 PMMethod::positionInCodeUntits(const Vec3& pos) {
   return pos / H;
@@ -141,11 +118,16 @@ double PMMethod::densityToCodeUnits(double density, double G) {
   return DT * DT * 4 * std::numbers::pi * G * density;
 }
 
-void PMMethod::stateToCodeUnits(std::vector<Vec3>& state, int n) {
-  for (int i = 0; i < n; i++) {
-    state[i] = positionInCodeUntits(state[i]);
-    state[n + i] = velocityInCodeUnits(state[n + i]);
-  }
+void PMMethod::stateToCodeUnits() {
+  std::transform(state.begin(), state.begin() + N, state.begin(),
+                 [this](const Vec3& pos) { return positionInCodeUntits(pos); });
+  std::transform(state.begin() + N, state.end(), state.begin() + N,
+                 [this](const Vec3& v) { return velocityInCodeUnits(v); });
+}
+
+void PMMethod::velocitiesToCodeUnits() {
+  std::transform(velocities.begin(), velocities.end(), state.begin() + N,
+                 [this](const Vec3& v) { return velocityInCodeUnits(v); });
 }
 
 Vec3 PMMethod::positionInOriginalUnits(const Vec3& pos) {
@@ -156,11 +138,16 @@ Vec3 PMMethod::velocityInOriginalUnits(const Vec3& v) {
   return H * v / DT;
 }
 
-void PMMethod::stateToOriginalUnits(std::vector<Vec3>& state, int n) {
-  for (int i = 0; i < n; ++i) {
-    state[i] = positionInOriginalUnits(state[i]);
-    state[n + i] = velocityInOriginalUnits(state[n + i]);
-  }
+void PMMethod::stateToOriginalUnits() {
+  std::transform(state.begin(), state.begin() + N, state.begin(),
+                 [this](const Vec3& pos) { return positionInOriginalUnits(pos); });
+  std::transform(state.begin() + N, state.end(), state.begin() + N,
+                 [this](const Vec3& v) { return velocityInOriginalUnits(v); });
+}
+
+void PMMethod::velocitiesToOriginalUnits() {
+  std::transform(velocities.begin(), velocities.end(), velocities.begin(),
+                 [this](const Vec3& v) { return velocityInOriginalUnits(v); });
 }
 
 void PMMethod::reassignDensity(const std::vector<double>& masses, double G) {
@@ -180,23 +167,6 @@ Vec3 PMMethod::getFieldAtMeshpoint(double x, double y, double z) {
   int zi = (int)std::round(z);
 
   return grid.getField(xi, yi, zi);
-}
-
-PMMethod::~PMMethod() {
-  kiss_fft_free(cfg);
-  delete[] density;
-  delete[] densityFourier;
-
-  kiss_fft_free(cfgInv);
-  delete[] potential;
-  delete[] potentialFourier;
-}
-
-void printState(const std::vector<Vec3>& state) {
-  for (const auto& i : state) {
-    std::cout << i.toString() << '\n';
-  }
-  std::cout << '\n';
 }
 
 void setIntegerVelocities(const std::vector<Vec3>& state,
@@ -222,14 +192,15 @@ std::string PMMethod::run(const double simLengthSeconds,
   double curFrameAcc = 0;
   const double frameLength = 1.0 / frameRate;
 
+  stateToCodeUnits();
+  updateAccelerations(G);
+
   // set v_(1/2)
   // from this point on state[n + i] holds velocities at half-step
   for (int i = 0; i < n; i++) {
     state[n + i] += 0.5 * accelerations[i];
   }
-  std::vector<Vec3> velocities(n);  // velocities at integer step (needed only for display)
 
-  stateToCodeUnits(state, n);
   for (double t = 0; t <= simLengthSeconds; t += DT) {
     std::cout << "progress: " << t / simLengthSeconds << '\r';
     std::cout.flush();
@@ -238,9 +209,8 @@ std::string PMMethod::run(const double simLengthSeconds,
     }
     if (curFrameAcc <= 0) {
       setIntegerVelocities(state, masses, G, 1, accelerations, velocities);
-      stateToOriginalUnits(state, n);
-      std::transform(velocities.begin(), velocities.end(), velocities.begin(),
-                     [this](const Vec3& v) { return velocityInOriginalUnits(v); });
+      stateToOriginalUnits();
+      velocitiesToOriginalUnits();
       stateRecorder.recordState(state.begin(), state.begin() + n);
       stateRecorder.recordTotalEnergy(totalEnergy(state.begin(), state.begin() + n,
                                                   velocities.begin(), velocities.end(), masses, G));
@@ -248,9 +218,8 @@ std::string PMMethod::run(const double simLengthSeconds,
       stateRecorder.recordTotalMomentum(
           totalMomentum(velocities.begin(), velocities.end(), masses));
       curFrameAcc = frameLength;
-      stateToCodeUnits(state, n);
-      std::transform(velocities.begin(), velocities.end(), velocities.begin(),
-                     [this](const Vec3& v) { return velocityInCodeUnits(v); });
+      stateToCodeUnits();
+      velocitiesToCodeUnits();
     }
     updateAccelerations(G);
     // now that we have accelerations of all particles, we can predict motion
