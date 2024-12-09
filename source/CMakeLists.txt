@@ -9,7 +9,17 @@
 	stateRecorder.cpp
 	ppMethod.h 
 	ppMethod.cpp
+	pmMethod.h
+	pmMethod.cpp
+	simInfo.h
+	simInfo.cpp
+	grid.h
+	grid.cpp
+	unit_conversions.h
+	unit_conversions.cpp
 	)
+
+target_link_libraries(ParticleSimulation kissfft)
 
 add_library(ParticleSimulationLib)
 target_sources(ParticleSimulationLib 

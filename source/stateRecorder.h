@@ -16,8 +16,8 @@ class StateRecorder {
 
  public:
   StateRecorder(const char* outPath, const char* energyPath, const char* momentumPath);
-  void recordState(std::vector<Vec3>::iterator begin, std::vector<Vec3>::iterator end);
-  void recordTotalEnergy(double energy);
+  void recordPositions(std::vector<Vec3>::iterator begin, std::vector<Vec3>::iterator end);
+  void recordEnergy(double pe, double ke);
   void recordTotalMomentum(Vec3 momentum);
   std::string flush();
 };

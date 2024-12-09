@@ -14,11 +14,11 @@ class Vec3 {
 
   Vec3& operator+=(const Vec3 other);
 
-  double getMagnitude();
+  double getMagnitude() const;
 
-  double getMagnitudeSquared();
+  double getMagnitudeSquared() const;
 
-  std::string toString();
+  std::string toString() const;
 };
 
 Vec3 operator+(const Vec3& a, const Vec3& b);
@@ -26,3 +26,5 @@ Vec3 operator+(const Vec3& a, const Vec3& b);
 Vec3 operator-(const Vec3& a, const Vec3& b);
 
 Vec3 operator*(double s, const Vec3& a);
+
+Vec3 operator/(const Vec3& a, double s);

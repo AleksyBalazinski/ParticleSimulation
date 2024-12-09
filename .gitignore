@@ -365,3 +365,5 @@ FodyWeavers.xsd
 animations/
 build/
 .vscode/
+temp.txt
+results/
