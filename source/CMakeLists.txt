@@ -15,6 +15,8 @@
 	simInfo.cpp
 	grid.h
 	grid.cpp
+	unit_conversions.h
+	unit_conversions.cpp
 	)
 
 target_link_libraries(ParticleSimulation kissfft)

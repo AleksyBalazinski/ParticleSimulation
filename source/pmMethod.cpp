@@ -5,11 +5,12 @@
 #include <cmath>
 #include <execution>
 #include <iostream>
-#include <numbers>
 #include <ranges>
+#include <stdexcept>
 #include "grid.h"
 #include "simInfo.h"
 #include "stateRecorder.h"
+#include "unit_conversions.h"
 #include "vec3.h"
 
 // #define DEBUG
@@ -18,6 +19,11 @@
 long long totalTimeMs = 0;
 long long fftTimeMs = 0;
 #endif
+
+bool isWithingBox(const Vec3& pos, double boxSize) {
+  return pos.x >= 0 && pos.x <= boxSize && pos.y >= 0 && pos.y <= boxSize && pos.z >= 0 &&
+         pos.z <= boxSize;
+}
 
 void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
                                    const std::vector<Vec3>& state,
@@ -29,6 +35,12 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
   auto beginAll = std::chrono::steady_clock::now();
 #endif
   int n = (int)masses.size();
+  if (int boxSize = grid.getGridPoints();
+      std::any_of(state.begin(), state.begin() + n,
+                  [boxSize](const Vec3 pos) { return !isWithingBox(pos, boxSize); })) {
+    throw std::runtime_error("A particle moved outside the computational box.");
+  }
+
   reassignDensity(state, masses, H, DT, G);
 
 #ifdef DEBUG
@@ -96,52 +108,6 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
   fftTimeMs += std::chrono::duration_cast<std::chrono::milliseconds>(endFFT1 - beginFFT1).count() +
                std::chrono::duration_cast<std::chrono::milliseconds>(endFFT2 - beginFFT2).count();
 #endif
-}
-
-Vec3 positionInCodeUntits(const Vec3& pos, double H) {
-  return pos / H;
-}
-
-Vec3 velocityInCodeUnits(const Vec3& v, double H, double DT) {
-  return DT * v / H;
-}
-
-double densityToCodeUnits(double density, double DT, double G) {
-  return DT * DT * 4 * std::numbers::pi * G * density;
-}
-
-void stateToCodeUnits(std::vector<Vec3>& state, double H, double DT) {
-  int N = (int)state.size() / 2;
-  std::transform(state.begin(), state.begin() + N, state.begin(),
-                 [H](const Vec3& pos) { return positionInCodeUntits(pos, H); });
-  std::transform(state.begin() + N, state.end(), state.begin() + N,
-                 [H, DT](const Vec3& v) { return velocityInCodeUnits(v, H, DT); });
-}
-
-void velocitiesToCodeUnits(std::vector<Vec3>& velocities, double H, double DT) {
-  std::transform(velocities.begin(), velocities.end(), velocities.begin(),
-                 [H, DT](const Vec3& v) { return velocityInCodeUnits(v, H, DT); });
-}
-
-Vec3 positionInOriginalUnits(const Vec3& pos, double H) {
-  return H * pos;
-}
-
-Vec3 velocityInOriginalUnits(const Vec3& v, double H, double DT) {
-  return H * v / DT;
-}
-
-void stateToOriginalUnits(std::vector<Vec3>& state, double H, double DT) {
-  int N = (int)state.size() / 2;
-  std::transform(state.begin(), state.begin() + N, state.begin(),
-                 [H](const Vec3& pos) { return positionInOriginalUnits(pos, H); });
-  std::transform(state.begin() + N, state.end(), state.begin() + N,
-                 [H, DT](const Vec3& v) { return velocityInOriginalUnits(v, H, DT); });
-}
-
-void velocitiesToOriginalUnits(std::vector<Vec3>& velocities, double H, double DT) {
-  std::transform(velocities.begin(), velocities.end(), velocities.begin(),
-                 [H, DT](const Vec3& v) { return velocityInOriginalUnits(v, H, DT); });
 }
 
 void PMMethod::reassignDensity(const std::vector<Vec3>& state,
@@ -233,7 +199,6 @@ std::string PMMethod::run(std::vector<Vec3>& state,
     for (int i = 0; i < n; i++) {
       state[n + i] += accelerations[i];
     }
-    // TODO: what if a particle ends up outside the grid?
     curFrameAcc -= stepSize;
   }
 
