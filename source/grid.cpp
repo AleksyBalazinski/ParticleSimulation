@@ -13,7 +13,7 @@ Grid::Grid(int gridPoints)
       densityFourier(length),
       potential(length),
       potentialFourier(length) {
-  memset(density.data(), 0, length * sizeof(kiss_fft_cpx));
+  std::memset(density.data(), 0, length * sizeof(kiss_fft_cpx));
 
   int dim = gridPoints;
   int dims[] = {dim, dim, dim};
@@ -31,7 +31,7 @@ void Grid::assignDensity(int x, int y, int z, double d) {
 }
 
 void Grid::clearDensity() {
-  memset(density.data(), 0, length * sizeof(kiss_fft_cpx));
+  std::memset(density.data(), 0, length * sizeof(kiss_fft_cpx));
 }
 
 void Grid::assignField(int x, int y, int z, Vec3 fieldVal) {

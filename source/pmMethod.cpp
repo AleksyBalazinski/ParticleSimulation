@@ -3,21 +3,27 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <execution>
 #include <iostream>
 #include <numbers>
+#include <ranges>
 #include "grid.h"
 #include "simInfo.h"
 #include "stateRecorder.h"
 #include "vec3.h"
 
-// #define DEBUG
+#define DEBUG
+
+#ifdef DEBUG
+long long totalTimeMs = 0;
+long long fftTimeMs = 0;
+#endif
 
 void PMMethod::updateAccelerations(double G) {
 #ifdef DEBUG
   auto beginAll = std::chrono::steady_clock::now();
 #endif
   int n = (int)masses.size();
-  int nfft = grid.getLength();
   reassignDensity(masses, G);
 
 #ifdef DEBUG
@@ -31,23 +37,23 @@ void PMMethod::updateAccelerations(double G) {
   // find potential in Fourier space
   int dim = grid.getGridPoints();
   grid.setPotentialFourier(0, 0, 0, kiss_fft_cpx(0, 0));
-  for (int kx = 0; kx < dim; ++kx) {
-    for (int ky = 0; ky < dim; ++ky) {
-      for (int kz = 0; kz < dim; ++kz) {
-        if (kx == 0 && ky == 0 && kz == 0) {
-          continue;
-        }
-        auto sx = std::sin(std::numbers::pi * kx / dim);
-        auto sy = std::sin(std::numbers::pi * ky / dim);
-        auto sz = std::sin(std::numbers::pi * kz / dim);
-        double G = -0.25 / (sx * sx + sy * sy + sz * sz);
-
-        auto densityFourier = grid.getDensityFourier(kx, ky, kz);
-        auto potentialFourier = kiss_fft_cpx(G * densityFourier.r, G * densityFourier.i);
-        grid.setPotentialFourier(kx, ky, kz, potentialFourier);
-      }
+  auto gridIdxRange = std::ranges::views::iota(0, dim * dim * dim);
+  std::for_each(std::execution::par, gridIdxRange.begin(), gridIdxRange.end(), [&](int idx) {
+    int kx = idx / (dim * dim);
+    int ky = (idx / dim) % dim;
+    int kz = idx % dim;
+    if (kx == 0 && ky == 0 && kz == 0) {
+      return;
     }
-  }
+    auto sx = std::sin(std::numbers::pi * kx / dim);
+    auto sy = std::sin(std::numbers::pi * ky / dim);
+    auto sz = std::sin(std::numbers::pi * kz / dim);
+    double G = -0.25 / (sx * sx + sy * sy + sz * sz);
+
+    auto densityFourier = grid.getDensityFourier(kx, ky, kz);
+    auto potentialFourier = kiss_fft_cpx(G * densityFourier.r, G * densityFourier.i);
+    grid.setPotentialFourier(kx, ky, kz, potentialFourier);
+  });
 
   // find real potential by applying IFFT
 #ifdef DEBUG
@@ -60,18 +66,17 @@ void PMMethod::updateAccelerations(double G) {
 #endif
 
   // find field in a meshpoint
-  for (int x = 0; x < dim; ++x) {
-    for (int y = 0; y < dim; ++y) {
-      for (int z = 0; z < dim; ++z) {
-        auto fieldX = -0.5 * (grid.getPotential(x + 1, y, z) - grid.getPotential(x - 1, y, z));
-        auto fieldY = -0.5 * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
-        auto fieldZ = -0.5 * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
+  std::for_each(std::execution::par, gridIdxRange.begin(), gridIdxRange.end(), [&](int idx) {
+    int x = idx / (dim * dim);
+    int y = (idx / dim) % dim;
+    int z = idx % dim;
+    auto fieldX = -0.5 * (grid.getPotential(x + 1, y, z) - grid.getPotential(x - 1, y, z));
+    auto fieldY = -0.5 * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
+    auto fieldZ = -0.5 * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
 
-        Vec3 fieldStrength(fieldX, fieldY, fieldZ);
-        grid.assignField(x, y, z, fieldStrength);
-      }
-    }
-  }
+    Vec3 fieldStrength(fieldX, fieldY, fieldZ);
+    grid.assignField(x, y, z, fieldStrength);
+  });
 
   // acceleration calculation
   for (int i = 0; i < n; ++i) {
@@ -80,14 +85,9 @@ void PMMethod::updateAccelerations(double G) {
 #ifdef DEBUG
   auto endAll = std::chrono::steady_clock::now();
 
-  std::cout << "Total time: "
-            << std::chrono::duration_cast<std::chrono::milliseconds>(endAll - beginAll).count()
-            << "[ms]\n";
-  std::cout
-      << "FFT time: "
-      << std::chrono::duration_cast<std::chrono::milliseconds>(endFFT1 - beginFFT1).count() +
-             std::chrono::duration_cast<std::chrono::milliseconds>(endFFT2 - beginFFT2).count()
-      << "[ms]\n";
+  totalTimeMs += std::chrono::duration_cast<std::chrono::milliseconds>(endAll - beginAll).count();
+  fftTimeMs += std::chrono::duration_cast<std::chrono::milliseconds>(endFFT1 - beginFFT1).count() +
+               std::chrono::duration_cast<std::chrono::milliseconds>(endFFT2 - beginFFT2).count();
 #endif
 }
 
@@ -157,7 +157,9 @@ void PMMethod::reassignDensity(const std::vector<double>& masses, double G) {
     int x = (int)std::round(state[i].x);
     int y = (int)std::round(state[i].y);
     int z = (int)std::round(state[i].z);
-    grid.assignDensity(x, y, z, densityToCodeUnits(masses[i], G));  // account for units change
+    grid.assignDensity(
+        x, y, z,
+        densityToCodeUnits(masses[i], G));  // account for units change TODO: divide by volume??
   }
 }
 
@@ -230,5 +232,10 @@ std::string PMMethod::run(const double simLengthSeconds,
     curFrameAcc -= DT;
   }
 
+#ifdef DEBUG
+  std::cout << "total time: " << totalTimeMs << "[ms]\n";
+  std::cout << "FFT time: " << fftTimeMs << "[ms]\n";
+  std::cout << "FFT contrib.: " << (float)fftTimeMs / totalTimeMs * 100 << "%\n";
+#endif
   return stateRecorder.flush();
 }
