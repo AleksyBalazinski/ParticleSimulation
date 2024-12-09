@@ -12,7 +12,7 @@ int main() {
                              Vec3(-1, -0.5, 0)};
   std::vector<double> masses = {50, 40};
 
-  PMMethod pm(state, masses, 32, 1, 0.001);
-  pm.run(5.0);
+  PMMethod pm(32);
+  pm.run(state, masses, 10.0, 0.01, 1);
   // ppMethod(state, masses, 10.0);
 }

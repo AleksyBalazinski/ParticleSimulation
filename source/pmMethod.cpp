@@ -12,24 +12,29 @@
 #include "stateRecorder.h"
 #include "vec3.h"
 
-#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
 long long totalTimeMs = 0;
 long long fftTimeMs = 0;
 #endif
 
-void PMMethod::updateAccelerations(double G) {
+void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
+                                   const std::vector<Vec3>& state,
+                                   const std::vector<double>& masses,
+                                   double H,
+                                   double DT,
+                                   double G) {
 #ifdef DEBUG
   auto beginAll = std::chrono::steady_clock::now();
 #endif
   int n = (int)masses.size();
-  reassignDensity(masses, G);
+  reassignDensity(state, masses, H, DT, G);
 
 #ifdef DEBUG
   auto beginFFT1 = std::chrono::steady_clock::now();
 #endif
-  auto densityFourier = grid.fftDensity();
+  grid.fftDensity();
 #ifdef DEBUG
   auto endFFT1 = std::chrono::steady_clock::now();
 #endif
@@ -38,45 +43,47 @@ void PMMethod::updateAccelerations(double G) {
   int dim = grid.getGridPoints();
   grid.setPotentialFourier(0, 0, 0, kiss_fft_cpx(0, 0));
   auto gridIdxRange = std::ranges::views::iota(0, dim * dim * dim);
-  std::for_each(std::execution::par, gridIdxRange.begin(), gridIdxRange.end(), [&](int idx) {
-    int kx = idx / (dim * dim);
-    int ky = (idx / dim) % dim;
-    int kz = idx % dim;
-    if (kx == 0 && ky == 0 && kz == 0) {
-      return;
-    }
-    auto sx = std::sin(std::numbers::pi * kx / dim);
-    auto sy = std::sin(std::numbers::pi * ky / dim);
-    auto sz = std::sin(std::numbers::pi * kz / dim);
-    double G = -0.25 / (sx * sx + sy * sy + sz * sz);
+  std::for_each(std::execution::par, gridIdxRange.begin(), gridIdxRange.end(),
+                [dim, this](int idx) {
+                  int kx = idx / (dim * dim);
+                  int ky = (idx / dim) % dim;
+                  int kz = idx % dim;
+                  if (kx == 0 && ky == 0 && kz == 0) {
+                    return;
+                  }
+                  auto sx = std::sin(std::numbers::pi * kx / dim);
+                  auto sy = std::sin(std::numbers::pi * ky / dim);
+                  auto sz = std::sin(std::numbers::pi * kz / dim);
+                  double G = -0.25 / (sx * sx + sy * sy + sz * sz);
 
-    auto densityFourier = grid.getDensityFourier(kx, ky, kz);
-    auto potentialFourier = kiss_fft_cpx(G * densityFourier.r, G * densityFourier.i);
-    grid.setPotentialFourier(kx, ky, kz, potentialFourier);
-  });
+                  auto densityFourier = grid.getDensityFourier(kx, ky, kz);
+                  auto potentialFourier = kiss_fft_cpx(G * densityFourier.r, G * densityFourier.i);
+                  grid.setPotentialFourier(kx, ky, kz, potentialFourier);
+                });
 
   // find real potential by applying IFFT
 #ifdef DEBUG
   auto beginFFT2 = std::chrono::steady_clock::now();
 #endif
-  auto potential = grid.invFftPotential();
+  grid.invFftPotential();
 
 #ifdef DEBUG
   auto endFFT2 = std::chrono::steady_clock::now();
 #endif
 
   // find field in a meshpoint
-  std::for_each(std::execution::par, gridIdxRange.begin(), gridIdxRange.end(), [&](int idx) {
-    int x = idx / (dim * dim);
-    int y = (idx / dim) % dim;
-    int z = idx % dim;
-    auto fieldX = -0.5 * (grid.getPotential(x + 1, y, z) - grid.getPotential(x - 1, y, z));
-    auto fieldY = -0.5 * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
-    auto fieldZ = -0.5 * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
+  std::for_each(
+      std::execution::par, gridIdxRange.begin(), gridIdxRange.end(), [dim, this](int idx) {
+        int x = idx / (dim * dim);
+        int y = (idx / dim) % dim;
+        int z = idx % dim;
+        auto fieldX = -0.5 * (grid.getPotential(x + 1, y, z) - grid.getPotential(x - 1, y, z));
+        auto fieldY = -0.5 * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
+        auto fieldZ = -0.5 * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
 
-    Vec3 fieldStrength(fieldX, fieldY, fieldZ);
-    grid.assignField(x, y, z, fieldStrength);
-  });
+        Vec3 fieldStrength(fieldX, fieldY, fieldZ);
+        grid.assignField(x, y, z, fieldStrength);
+      });
 
   // acceleration calculation
   for (int i = 0; i < n; ++i) {
@@ -91,75 +98,65 @@ void PMMethod::updateAccelerations(double G) {
 #endif
 }
 
-PMMethod::PMMethod(std::vector<Vec3>& state,
-                   std::vector<double>& masses,
-                   int gridPoints,
-                   double H,
-                   double DT)
-    : state(state),
-      masses(masses),
-      accelerations(masses.size()),
-      velocities(masses.size()),
-      gridPoints(gridPoints),
-      N(masses.size()),
-      H(H),
-      DT(DT),
-      grid(gridPoints) {}
-
-Vec3 PMMethod::positionInCodeUntits(const Vec3& pos) {
+Vec3 positionInCodeUntits(const Vec3& pos, double H) {
   return pos / H;
 }
 
-Vec3 PMMethod::velocityInCodeUnits(const Vec3& v) {
+Vec3 velocityInCodeUnits(const Vec3& v, double H, double DT) {
   return DT * v / H;
 }
 
-double PMMethod::densityToCodeUnits(double density, double G) {
+double densityToCodeUnits(double density, double DT, double G) {
   return DT * DT * 4 * std::numbers::pi * G * density;
 }
 
-void PMMethod::stateToCodeUnits() {
+void stateToCodeUnits(std::vector<Vec3>& state, double H, double DT) {
+  int N = (int)state.size() / 2;
   std::transform(state.begin(), state.begin() + N, state.begin(),
-                 [this](const Vec3& pos) { return positionInCodeUntits(pos); });
+                 [H](const Vec3& pos) { return positionInCodeUntits(pos, H); });
   std::transform(state.begin() + N, state.end(), state.begin() + N,
-                 [this](const Vec3& v) { return velocityInCodeUnits(v); });
+                 [H, DT](const Vec3& v) { return velocityInCodeUnits(v, H, DT); });
 }
 
-void PMMethod::velocitiesToCodeUnits() {
-  std::transform(velocities.begin(), velocities.end(), state.begin() + N,
-                 [this](const Vec3& v) { return velocityInCodeUnits(v); });
+void velocitiesToCodeUnits(std::vector<Vec3>& velocities, double H, double DT) {
+  std::transform(velocities.begin(), velocities.end(), velocities.begin(),
+                 [H, DT](const Vec3& v) { return velocityInCodeUnits(v, H, DT); });
 }
 
-Vec3 PMMethod::positionInOriginalUnits(const Vec3& pos) {
+Vec3 positionInOriginalUnits(const Vec3& pos, double H) {
   return H * pos;
 }
 
-Vec3 PMMethod::velocityInOriginalUnits(const Vec3& v) {
+Vec3 velocityInOriginalUnits(const Vec3& v, double H, double DT) {
   return H * v / DT;
 }
 
-void PMMethod::stateToOriginalUnits() {
+void stateToOriginalUnits(std::vector<Vec3>& state, double H, double DT) {
+  int N = (int)state.size() / 2;
   std::transform(state.begin(), state.begin() + N, state.begin(),
-                 [this](const Vec3& pos) { return positionInOriginalUnits(pos); });
+                 [H](const Vec3& pos) { return positionInOriginalUnits(pos, H); });
   std::transform(state.begin() + N, state.end(), state.begin() + N,
-                 [this](const Vec3& v) { return velocityInOriginalUnits(v); });
+                 [H, DT](const Vec3& v) { return velocityInOriginalUnits(v, H, DT); });
 }
 
-void PMMethod::velocitiesToOriginalUnits() {
+void velocitiesToOriginalUnits(std::vector<Vec3>& velocities, double H, double DT) {
   std::transform(velocities.begin(), velocities.end(), velocities.begin(),
-                 [this](const Vec3& v) { return velocityInOriginalUnits(v); });
+                 [H, DT](const Vec3& v) { return velocityInOriginalUnits(v, H, DT); });
 }
 
-void PMMethod::reassignDensity(const std::vector<double>& masses, double G) {
+void PMMethod::reassignDensity(const std::vector<Vec3>& state,
+                               const std::vector<double>& masses,
+                               double H,
+                               double DT,
+                               double G) {
   int n = (int)masses.size();
   grid.clearDensity();
   for (int i = 0; i < n; i++) {
     int x = (int)std::round(state[i].x);
     int y = (int)std::round(state[i].y);
     int z = (int)std::round(state[i].z);
-    grid.assignDensity(
-        x, y, z,
-        densityToCodeUnits(masses[i], G));  // account for units change TODO: divide by volume??
+    double vol = H * H * H;
+    grid.assignDensity(x, y, z, densityToCodeUnits(masses[i] / vol, DT, G));
   }
 }
 
@@ -171,19 +168,25 @@ Vec3 PMMethod::getFieldAtMeshpoint(double x, double y, double z) {
   return grid.getField(xi, yi, zi);
 }
 
-void setIntegerVelocities(const std::vector<Vec3>& state,
+void setIntegerVelocities(std::vector<Vec3>& intVs,
+                          const std::vector<Vec3>& state,
                           const std::vector<double>& masses,
                           double G,
                           double h,
-                          const std::vector<Vec3>& accelerations,
-                          std::vector<Vec3>& intVs) {
+                          const std::vector<Vec3>& accelerations) {
   int n = (int)intVs.size();
-  for (size_t i = 0; i < n; i++) {
+  for (int i = 0; i < n; i++) {
     intVs[i] = state[n + i] + 0.5 * h * accelerations[i];
   }
 }
 
-std::string PMMethod::run(const double simLengthSeconds,
+PMMethod::PMMethod(int gridPoints) : grid(gridPoints) {}
+
+std::string PMMethod::run(std::vector<Vec3>& state,
+                          std::vector<double>& masses,
+                          const double simLengthSeconds,
+                          const double stepSize,
+                          const double cellSize,
                           const double G,
                           const int frameRate,
                           const char* outPath,
@@ -193,9 +196,11 @@ std::string PMMethod::run(const double simLengthSeconds,
   const int n = (int)masses.size();
   double curFrameAcc = 0;
   const double frameLength = 1.0 / frameRate;
+  std::vector<Vec3> accelerations(n);
+  std::vector<Vec3> velocities(n);  // velocities at integer step (needed only for display)
 
-  stateToCodeUnits();
-  updateAccelerations(G);
+  stateToCodeUnits(state, cellSize, stepSize);
+  updateAccelerations(accelerations, state, masses, cellSize, stepSize, G);
 
   // set v_(1/2)
   // from this point on state[n + i] holds velocities at half-step
@@ -203,33 +208,33 @@ std::string PMMethod::run(const double simLengthSeconds,
     state[n + i] += 0.5 * accelerations[i];
   }
 
-  for (double t = 0; t <= simLengthSeconds; t += DT) {
+  for (double t = 0; t <= simLengthSeconds; t += stepSize) {
     std::cout << "progress: " << t / simLengthSeconds << '\r';
     std::cout.flush();
     for (int i = 0; i < n; i++) {
       state[i] += state[n + i];
     }
     if (curFrameAcc <= 0) {
-      setIntegerVelocities(state, masses, G, 1, accelerations, velocities);
-      stateToOriginalUnits();
-      velocitiesToOriginalUnits();
-      stateRecorder.recordState(state.begin(), state.begin() + n);
-      stateRecorder.recordTotalEnergy(totalEnergy(state.begin(), state.begin() + n,
-                                                  velocities.begin(), velocities.end(), masses, G));
+      setIntegerVelocities(velocities, state, masses, G, 1, accelerations);
+      stateToOriginalUnits(state, cellSize, stepSize);
+      velocitiesToOriginalUnits(velocities, cellSize, stepSize);
+      stateRecorder.recordPositions(state.begin(), state.begin() + n);
+      stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
+                                 kineticEnergy(velocities.begin(), velocities.end(), masses, G));
 
       stateRecorder.recordTotalMomentum(
           totalMomentum(velocities.begin(), velocities.end(), masses));
       curFrameAcc = frameLength;
-      stateToCodeUnits();
-      velocitiesToCodeUnits();
+      stateToCodeUnits(state, cellSize, stepSize);
+      velocitiesToCodeUnits(velocities, cellSize, stepSize);
     }
-    updateAccelerations(G);
+    updateAccelerations(accelerations, state, masses, cellSize, stepSize, G);
     // now that we have accelerations of all particles, we can predict motion
     for (int i = 0; i < n; i++) {
       state[n + i] += accelerations[i];
     }
     // TODO: what if a particle ends up outside the grid?
-    curFrameAcc -= DT;
+    curFrameAcc -= stepSize;
   }
 
 #ifdef DEBUG

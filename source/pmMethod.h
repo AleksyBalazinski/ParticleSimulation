@@ -12,42 +12,30 @@
 
 class PMMethod {
  private:
-  std::vector<Vec3>& state;
-  std::vector<double>& masses;
-  std::vector<Vec3> accelerations;
-  std::vector<Vec3> velocities;  // velocities at integer step (needed only for display)
-
-  int gridPoints;
-  int N;
-  double H;
-  double DT;
   Grid grid;
 
-  Vec3 positionInCodeUntits(const Vec3& pos);
-  Vec3 velocityInCodeUnits(const Vec3& v);
-  double densityToCodeUnits(double density, double G);
-  void stateToCodeUnits();
-  void velocitiesToCodeUnits();
-  Vec3 positionInOriginalUnits(const Vec3& pos);
-  Vec3 velocityInOriginalUnits(const Vec3& v);
-  void stateToOriginalUnits();
-  void velocitiesToOriginalUnits();
-
-  void reassignDensity(const std::vector<double>& masses, double G);
+  void reassignDensity(const std::vector<Vec3>& state,
+                       const std::vector<double>& masses,
+                       double H,
+                       double DT,
+                       double G);
   Vec3 getFieldAtMeshpoint(double x, double y, double z);
 
-  void updateAccelerations(double G);
+  void updateAccelerations(std::vector<Vec3>& accelerations,
+                           const std::vector<Vec3>& state,
+                           const std::vector<double>& masses,
+                           double H,
+                           double DT,
+                           double G);
 
  public:
-  PMMethod(std::vector<Vec3>& state,
-           std::vector<double>& masses,
-           int gridPoints,
-           double H,
-           double DT);  // TODO: store only the grid stuff in the class, there is no reason to force
-                        // the user to create a new instance just because they want to run a
-                        // different simulation on the same grid
+  PMMethod(int gridPoints);
 
-  std::string run(const double simLengthSeconds = 10.0,
+  std::string run(std::vector<Vec3>& state,
+                  std::vector<double>& masses,
+                  const double simLengthSeconds = 10.0,
+                  const double stepSize = 0.001,
+                  const double cellSize = 1,
                   const double G = 1,
                   const int frameRate = 30,
                   const char* outPath = "output.txt",

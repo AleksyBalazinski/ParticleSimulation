@@ -3,20 +3,18 @@
 #include <fstream>
 
 StateRecorder::StateRecorder(const char* outPath, const char* energyPath, const char* momentumPath)
-    : outPath(outPath),
-      energyPath(energyPath),
-      momentumPath(momentumPath) {}
+    : outPath(outPath), energyPath(energyPath), momentumPath(momentumPath) {}
 
-void StateRecorder::recordState(std::vector<Vec3>::iterator begin,
-                                std::vector<Vec3>::iterator end) {
+void StateRecorder::recordPositions(std::vector<Vec3>::iterator begin,
+                                    std::vector<Vec3>::iterator end) {
   for (auto it = begin; it != end; ++it) {
     framesStr += it->toString() + '\n';
   }
   framesStr += "\n\n";
 }
 
-void StateRecorder::recordTotalEnergy(double energy) {
-  energyStr += std::to_string(energy);
+void StateRecorder::recordEnergy(double pe, double ke) {
+  energyStr += std::to_string(pe) + ' ' + std::to_string(ke);
   energyStr += '\n';
 }
 

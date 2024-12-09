@@ -2,6 +2,8 @@
 #include <cmath>
 #include "simInfo.h"
 
+// #define LEAPFROG
+
 Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<double>& masses, double G) {
   const int n = (int)masses.size();
   Vec3 acc;
@@ -32,7 +34,7 @@ void setIntegerVelocities(const std::vector<Vec3>& state,
                           double h,
                           std::vector<Vec3>& intVs) {
   int n = (int)intVs.size();
-  for (size_t i = 0; i < n; i++) {
+  for (int i = 0; i < n; i++) {
     intVs[i] = state[n + i] + 0.5 * h * acceleration(i, state, masses, G);
   }
 }
@@ -47,43 +49,54 @@ std::string ppMethod(std::vector<Vec3>& state,
                      const char* energyPath,
                      const char* momentumPath) {
   const int n = (int)masses.size();
-  auto system = [&masses, G](StateType& x, StateType& dxdt, double t) {
-    nBody(x, dxdt, t, masses, G);
-  };
-  RK4Stepper<Vec3> stepper(system, 2 * n);
-
   const double frameLength = 1.0 / frameRate;
   StateRecorder stateRecorder(outPath, energyPath, momentumPath);
   double curFrameAcc = 0;
-
+#ifdef LEAPFROG
   // set v_(1/2)
   // from this point on state[n + i] holds velocities at half-step
-  // for (int i = 0; i < n; i++) {
-  //   state[n + i] += 0.5 * stepSize * acceleration(i, state, masses, G);
-  // }
-  // std::vector<Vec3> velocities(n);  // velocities at integer step (needed only for display)
+  for (int i = 0; i < n; i++) {
+    state[n + i] += 0.5 * stepSize * acceleration(i, state, masses, G);
+  }
+  std::vector<Vec3> velocities(n);  // velocities at integer step (needed only for display)
+#else
+  auto system = [&masses, G](StateType& x, StateType& dxdt, double t) {
+    nBody(x, dxdt, t, masses, G);
+  };
 
+  RK4Stepper<Vec3> stepper(system, 2 * n);
+#endif
   for (double t = 0; t <= simLengthSeconds; t += stepSize) {
-    // for (int i = 0; i < n; i++) {
-    //   state[i] += stepSize * state[n + i];
-    // }
+#ifdef LEAPFROG
+    for (int i = 0; i < n; i++) {
+      state[i] += stepSize * state[n + i];
+    }
+#endif
     if (curFrameAcc <= 0) {
-      // setIntegerVelocities(state, masses, G, stepSize, velocities);
-      stateRecorder.recordState(state.begin(), state.begin() + n);
-      // stateRecorder.recordTotalEnergy(totalEnergy(state.begin(), state.begin() + n,
-      //                                             velocities.begin(), velocities.end(), masses,
-      //                                             G));
-      stateRecorder.recordTotalEnergy(
-          totalEnergy(state.begin(), state.begin() + n, state.begin() + n, state.end(), masses, G));
-      // stateRecorder.recordTotalMomentum(
-      //     totalMomentum(velocities.begin(), velocities.end(), masses));
+#ifdef LEAPFROG
+      setIntegerVelocities(state, masses, G, stepSize, velocities);
+      stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
+                                 kineticEnergy(velocities.begin(), velocities.end(), masses, G));
+#else
+      stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
+                                 kineticEnergy(state.begin() + n, state.end(), masses, G));
+#endif
+      stateRecorder.recordPositions(state.begin(), state.begin() + n);
+
+#ifdef LEAPFROG
       stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
+#else
+      stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
+#endif
       curFrameAcc = frameLength;
     }
+#ifdef LEAPFROG
+    for (int i = 0; i < n; i++) {
+      state[n + i] += stepSize * acceleration(i, state, masses, G);
+    }
+#else
     stepper.doStep(state, stepSize);
-    // for (int i = 0; i < n; i++) {
-    //   state[n + i] += stepSize * acceleration(i, state, masses, G);
-    // }
+#endif
 
     curFrameAcc -= stepSize;
   }
