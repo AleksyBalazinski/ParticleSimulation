@@ -1,8 +1,8 @@
 #include "pmMethod.h"
-#include <kiss_fftnd.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <complex>
 #include <execution>
 #include <iostream>
 #include <ranges>
@@ -30,7 +30,8 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
                                    const std::vector<double>& masses,
                                    double H,
                                    double DT,
-                                   double G) {
+                                   double G,
+                                   InterpolationScheme is) {
 #ifdef DEBUG
   auto beginAll = std::chrono::steady_clock::now();
 #endif
@@ -41,7 +42,7 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
     throw std::runtime_error("A particle moved outside the computational box.");
   }
 
-  reassignDensity(state, masses, H, DT, G);
+  reassignDensity(state, masses, H, DT, G, is);
 
 #ifdef DEBUG
   auto beginFFT1 = std::chrono::steady_clock::now();
@@ -53,7 +54,7 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
 
   // find potential in Fourier space
   int dim = grid.getGridPoints();
-  grid.setPotentialFourier(0, 0, 0, kiss_fft_cpx(0, 0));
+  grid.setPotentialFourier(0, 0, 0, std::complex<float>(0, 0));
   auto gridIdxRange = std::ranges::views::iota(0, dim * dim * dim);
   std::for_each(std::execution::par, gridIdxRange.begin(), gridIdxRange.end(),
                 [dim, this](int idx) {
@@ -69,7 +70,8 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
                   double G = -0.25 / (sx * sx + sy * sy + sz * sz);
 
                   auto densityFourier = grid.getDensityFourier(kx, ky, kz);
-                  auto potentialFourier = kiss_fft_cpx(G * densityFourier.r, G * densityFourier.i);
+                  auto potentialFourier =
+                      std::complex<float>(G * densityFourier.real(), G * densityFourier.imag());
                   grid.setPotentialFourier(kx, ky, kz, potentialFourier);
                 });
 
@@ -99,7 +101,7 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
 
   // acceleration calculation
   for (int i = 0; i < n; ++i) {
-    accelerations[i] = getFieldAtMeshpoint(state[i].x, state[i].y, state[i].z);
+    accelerations[i] = getFieldAtMeshpoint(state[i].x, state[i].y, state[i].z, is);
   }
 #ifdef DEBUG
   auto endAll = std::chrono::steady_clock::now();
@@ -114,24 +116,85 @@ void PMMethod::reassignDensity(const std::vector<Vec3>& state,
                                const std::vector<double>& masses,
                                double H,
                                double DT,
-                               double G) {
+                               double G,
+                               InterpolationScheme is) {
   int n = (int)masses.size();
   grid.clearDensity();
-  for (int i = 0; i < n; i++) {
-    int x = (int)std::round(state[i].x);
-    int y = (int)std::round(state[i].y);
-    int z = (int)std::round(state[i].z);
-    double vol = H * H * H;
-    grid.assignDensity(x, y, z, densityToCodeUnits(masses[i] / vol, DT, G));
+
+  switch (is) {
+    case InterpolationScheme::NGP:
+      for (int i = 0; i < n; i++) {
+        int x = (int)std::round(state[i].x);
+        int y = (int)std::round(state[i].y);
+        int z = (int)std::round(state[i].z);
+
+        double vol = H * H * H;
+        grid.assignDensity(x, y, z, densityToCodeUnits(masses[i] / vol, DT, G));
+      }
+      return;
+
+    case InterpolationScheme::CIC:
+      for (int i = 0; i < n; i++) {
+        int x = (int)state[i].x;
+        int y = (int)state[i].y;
+        int z = (int)state[i].z;
+
+        double vol = H * H * H;
+        double d = densityToCodeUnits(masses[i] / vol, DT, G);
+
+        double dx = state[i].x - x;
+        double dy = state[i].y - y;
+        double dz = state[i].z - z;
+        double tx = 1 - dx;
+        double ty = 1 - dy;
+        double tz = 1 - dz;
+
+        grid.assignDensity(x, y, z, d * tx * ty * tz);
+        grid.assignDensity(x + 1, y, z, d * dx * ty * tz);
+        grid.assignDensity(x, y + 1, z, d * tx * dy * tz);
+        grid.assignDensity(x, y, z + 1, d * tx * ty * dz);
+
+        grid.assignDensity(x + 1, y + 1, z, d * dx * dy * tz);
+        grid.assignDensity(x + 1, y, z + 1, d * dx * ty * dz);
+        grid.assignDensity(x, y + 1, z + 1, d * tx * dy * dz);
+
+        grid.assignDensity(x + 1, y + 1, z + 1, d * dx * dy * dz);
+      }
+
+      return;
   }
 }
 
-Vec3 PMMethod::getFieldAtMeshpoint(double x, double y, double z) {
-  int xi = (int)std::round(x);
-  int yi = (int)std::round(y);
-  int zi = (int)std::round(z);
+Vec3 PMMethod::getFieldAtMeshpoint(double x, double y, double z, InterpolationScheme is) {
+  switch (is) {
+    case InterpolationScheme::NGP: {
+      int xi = (int)std::round(x);
+      int yi = (int)std::round(y);
+      int zi = (int)std::round(z);
+      return grid.getField(xi, yi, zi);
+    }
 
-  return grid.getField(xi, yi, zi);
+    case InterpolationScheme::CIC: {
+      int xi = (int)x;
+      int yi = (int)y;
+      int zi = (int)z;
+      double dx = x - xi;
+      double dy = y - yi;
+      double dz = z - zi;
+      double tx = 1 - dx;
+      double ty = 1 - dy;
+      double tz = 1 - dz;
+
+      return tx * ty * tz * grid.getField(xi, yi, zi) +
+             dx * ty * tz * grid.getField(xi + 1, yi, zi) +
+             tx * dy * tz * grid.getField(xi, yi + 1, zi) +
+             tx * ty * dz * grid.getField(xi, yi, zi + 1) +
+             dx * dy * tz * grid.getField(xi + 1, yi + 1, zi) +
+             dx * ty * dz * grid.getField(xi + 1, yi, zi + 1) +
+             tx * dy * dz * grid.getField(xi, yi + 1, zi + 1) +
+             dx * dy * dz * grid.getField(xi + 1, yi + 1, zi + 1);
+    }
+  }
 }
 
 void setIntegerVelocities(std::vector<Vec3>& intVs,
@@ -146,13 +209,12 @@ void setIntegerVelocities(std::vector<Vec3>& intVs,
   }
 }
 
-PMMethod::PMMethod(int gridPoints) : grid(gridPoints) {}
-
 std::string PMMethod::run(std::vector<Vec3>& state,
                           std::vector<double>& masses,
                           const double simLengthSeconds,
                           const double stepSize,
                           const double cellSize,
+                          InterpolationScheme is,
                           const double G,
                           const int frameRate,
                           const char* outPath,
@@ -166,7 +228,7 @@ std::string PMMethod::run(std::vector<Vec3>& state,
   std::vector<Vec3> velocities(n);  // velocities at integer step (needed only for display)
 
   stateToCodeUnits(state, cellSize, stepSize);
-  updateAccelerations(accelerations, state, masses, cellSize, stepSize, G);
+  updateAccelerations(accelerations, state, masses, cellSize, stepSize, G, is);
 
   // set v_(1/2)
   // from this point on state[n + i] holds velocities at half-step
@@ -194,7 +256,7 @@ std::string PMMethod::run(std::vector<Vec3>& state,
       stateToCodeUnits(state, cellSize, stepSize);
       velocitiesToCodeUnits(velocities, cellSize, stepSize);
     }
-    updateAccelerations(accelerations, state, masses, cellSize, stepSize, G);
+    updateAccelerations(accelerations, state, masses, cellSize, stepSize, G, is);
     // now that we have accelerations of all particles, we can predict motion
     for (int i = 0; i < n; i++) {
       state[n + i] += accelerations[i];

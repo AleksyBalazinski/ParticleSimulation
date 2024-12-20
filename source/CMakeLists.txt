@@ -17,6 +17,8 @@
 	grid.cpp
 	unit_conversions.h
 	unit_conversions.cpp
+	FFTAdapter.h
+	kissFFTAdapter.h
 	)
 
 target_link_libraries(ParticleSimulation kissfft)
