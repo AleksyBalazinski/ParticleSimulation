@@ -1,8 +1,8 @@
 #include "pmMethod.h"
-#include <kiss_fftnd.h>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <complex>
 #include <execution>
 #include <iostream>
 #include <ranges>
@@ -54,7 +54,7 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
 
   // find potential in Fourier space
   int dim = grid.getGridPoints();
-  grid.setPotentialFourier(0, 0, 0, kiss_fft_cpx(0, 0));
+  grid.setPotentialFourier(0, 0, 0, std::complex<float>(0, 0));
   auto gridIdxRange = std::ranges::views::iota(0, dim * dim * dim);
   std::for_each(std::execution::par, gridIdxRange.begin(), gridIdxRange.end(),
                 [dim, this](int idx) {
@@ -70,7 +70,8 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
                   double G = -0.25 / (sx * sx + sy * sy + sz * sz);
 
                   auto densityFourier = grid.getDensityFourier(kx, ky, kz);
-                  auto potentialFourier = kiss_fft_cpx(G * densityFourier.r, G * densityFourier.i);
+                  auto potentialFourier =
+                      std::complex<float>(G * densityFourier.real(), G * densityFourier.imag());
                   grid.setPotentialFourier(kx, ky, kz, potentialFourier);
                 });
 
@@ -207,8 +208,6 @@ void setIntegerVelocities(std::vector<Vec3>& intVs,
     intVs[i] = state[n + i] + 0.5 * h * accelerations[i];
   }
 }
-
-PMMethod::PMMethod(int gridPoints) : grid(gridPoints) {}
 
 std::string PMMethod::run(std::vector<Vec3>& state,
                           std::vector<double>& masses,

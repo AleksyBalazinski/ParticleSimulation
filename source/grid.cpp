@@ -1,37 +1,30 @@
 #include "grid.h"
+#include <kiss_fftnd.h>
 #include <algorithm>
+#include <complex>
 
 long Grid::getIndx(int i, int j, int k, int dim) const {
   return mod(i, dim) * dim * dim + mod(j, dim) * dim + mod(k, dim);
 }
 
-Grid::Grid(int gridPoints)
+Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
     : gridPoints(gridPoints),
       length(gridPoints * gridPoints * gridPoints),
       field(length),
       density(length),
       densityFourier(length),
       potential(length),
-      potentialFourier(length) {
-  std::memset(density.data(), 0, length * sizeof(kiss_fft_cpx));
-
-  int dim = gridPoints;
-  int dims[] = {dim, dim, dim};
-  cfg = kiss_fftnd_alloc(dims, 3, false, nullptr, nullptr);
-  cfgInv = kiss_fftnd_alloc(dims, 3, true, nullptr, nullptr);
-}
-
-Grid::~Grid() {
-  kiss_fft_free(cfg);
-  kiss_fft_free(cfgInv);
+      potentialFourier(length),
+      fftAdapter(fftAdapter) {
+  std::memset(density.data(), 0, length * sizeof(std::complex<float>));
 }
 
 void Grid::assignDensity(int x, int y, int z, double d) {
-  density[x * gridPoints * gridPoints + y * gridPoints + z].r += d;
+  density[x * gridPoints * gridPoints + y * gridPoints + z] += d;
 }
 
 void Grid::clearDensity() {
-  std::memset(density.data(), 0, length * sizeof(kiss_fft_cpx));
+  std::memset(density.data(), 0, length * sizeof(std::complex<float>));
 }
 
 void Grid::assignField(int x, int y, int z, Vec3 fieldVal) {
@@ -42,31 +35,28 @@ Vec3 Grid::getField(int x, int y, int z) {
   return field[x * gridPoints * gridPoints + y * gridPoints + z];
 }
 
-const std::vector<kiss_fft_cpx>& Grid::fftDensity() {
-  kiss_fftnd(cfg, density.data(), densityFourier.data());
-  return densityFourier;
+const std::vector<std::complex<float>>& Grid::fftDensity() {
+  return fftAdapter.fft(density, densityFourier);
 }
 
-const std::vector<kiss_fft_cpx>& Grid::invFftPotential() {
-  kiss_fftnd(cfgInv, potentialFourier.data(), potential.data());
+const std::vector<std::complex<float>>& Grid::invFftPotential() {
+  fftAdapter.ifft(potentialFourier, potential);
   for (int i = 0; i < length; i++) {
-    potential[i].r /= length;
-    potential[i].i /= length;
+    potential[i] /= length;
   }
   return potential;
 }
 
-void Grid::setPotentialFourier(int i, int j, int k, kiss_fft_cpx value) {
+void Grid::setPotentialFourier(int i, int j, int k, std::complex<float> value) {
   int idx = i * gridPoints * gridPoints + j * gridPoints + k;
-  potentialFourier[idx].r = value.r;
-  potentialFourier[idx].i = value.i;
+  potentialFourier[idx] = value;
 }
 
-kiss_fft_cpx Grid::getDensityFourier(int i, int j, int k) const {
+std::complex<float> Grid::getDensityFourier(int i, int j, int k) const {
   int idx = i * gridPoints * gridPoints + j * gridPoints + k;
   return densityFourier[idx];
 }
 
 double Grid::getPotential(int i, int j, int k) const {
-  return potential[getIndx(i, j, k, gridPoints)].r;
+  return potential[getIndx(i, j, k, gridPoints)].real();
 }

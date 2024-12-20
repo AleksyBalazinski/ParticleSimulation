@@ -33,7 +33,7 @@ class PMMethod {
                            InterpolationScheme is);
 
  public:
-  PMMethod(int gridPoints);
+  PMMethod(int gridPoints, FFTAdapter<float>& fftAdapter) : grid(gridPoints, fftAdapter) {};
 
   std::string run(std::vector<Vec3>& state,
                   std::vector<double>& masses,

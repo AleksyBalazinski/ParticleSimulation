@@ -1,7 +1,8 @@
 #pragma once
 
-#include <kiss_fftnd.h>
+#include <complex>
 #include <vector>
+#include "fftAdapter.h"
 #include "vec3.h"
 
 class Grid {
@@ -14,18 +15,15 @@ class Grid {
 
   long getIndx(int i, int j, int k, int dim) const;
 
-  std::vector<kiss_fft_cpx> density;
-  std::vector<kiss_fft_cpx> densityFourier;
-  std::vector<kiss_fft_cpx> potential;
-  std::vector<kiss_fft_cpx> potentialFourier;
+  std::vector<std::complex<float>> density;
+  std::vector<std::complex<float>> densityFourier;
+  std::vector<std::complex<float>> potential;
+  std::vector<std::complex<float>> potentialFourier;
 
-  kiss_fftnd_cfg cfg;
-  kiss_fftnd_cfg cfgInv;
+  FFTAdapter<float>& fftAdapter;
 
  public:
-  Grid(int gridPoints);
-
-  ~Grid();
+  Grid(int gridPoints, FFTAdapter<float>& fftAdapter);
 
   void assignDensity(int x, int y, int z, double density);
 
@@ -39,13 +37,13 @@ class Grid {
 
   int getGridPoints() const { return gridPoints; }
 
-  const std::vector<kiss_fft_cpx>& fftDensity();
+  const std::vector<std::complex<float>>& fftDensity();
 
-  const std::vector<kiss_fft_cpx>& invFftPotential();
+  const std::vector<std::complex<float>>& invFftPotential();
 
-  void setPotentialFourier(int i, int j, int k, kiss_fft_cpx value);
+  void setPotentialFourier(int i, int j, int k, std::complex<float> value);
 
-  kiss_fft_cpx getDensityFourier(int i, int j, int k) const;
+  std::complex<float> getDensityFourier(int i, int j, int k) const;
 
   double getPotential(int i, int j, int k) const;
 };
