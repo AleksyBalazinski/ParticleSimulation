@@ -1,5 +1,4 @@
 #include "grid.h"
-#include <kiss_fftnd.h>
 #include <algorithm>
 #include <complex>
 

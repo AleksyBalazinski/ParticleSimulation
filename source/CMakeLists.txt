@@ -1,25 +1,15 @@
 ﻿add_executable (ParticleSimulation
 	main.cpp
-	abstractStepper.h
-	RK4Stepper.h
-	vec3.h
 	vec3.cpp
-	utils.h
-	stateRecorder.h
 	stateRecorder.cpp
-	ppMethod.h 
 	ppMethod.cpp
-	pmMethod.h
 	pmMethod.cpp
-	simInfo.h
 	simInfo.cpp
-	grid.h
 	grid.cpp
-	unit_conversions.h
 	unit_conversions.cpp
-	FFTAdapter.h
-	kissFFTAdapter.h
 	)
+
+target_include_directories(ParticleSimulation PRIVATE ${PROJECT_SOURCE_DIR}/include)
 
 target_link_libraries(ParticleSimulation kissfft)
 
@@ -33,5 +23,5 @@ PRIVATE
 
 target_include_directories(ParticleSimulationLib
 PUBLIC 
-	${CMAKE_CURRENT_LIST_DIR}
+${PROJECT_SOURCE_DIR}/include
 )
