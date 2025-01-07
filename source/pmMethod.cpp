@@ -217,10 +217,10 @@ std::string PMMethod::run(std::vector<Vec3>& state,
                           InterpolationScheme is,
                           const double G,
                           const int frameRate,
-                          const char* outPath,
+                          const char* positionsPath,
                           const char* energyPath,
                           const char* momentumPath) {
-  StateRecorder stateRecorder(outPath, energyPath, momentumPath);
+  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath);
   const int n = (int)masses.size();
   double curFrameAcc = 0;
   const double frameLength = 1.0 / frameRate;

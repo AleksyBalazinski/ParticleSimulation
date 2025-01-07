@@ -12,6 +12,6 @@ std::string ppMethod(std::vector<Vec3>& state,
                      const double stepSize = 0.001,
                      const double G = 1,
                      const int frameRate = 30,
-                     const char* outPath = "output.txt",
+                     const char* positionsPath = "output.txt",
                      const char* energyPath = "energy.txt",
                      const char* momentumPath = "momentum.txt");

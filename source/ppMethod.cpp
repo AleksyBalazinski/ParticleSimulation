@@ -45,12 +45,12 @@ std::string ppMethod(std::vector<Vec3>& state,
                      const double stepSize,
                      const double G,
                      const int frameRate,
-                     const char* outPath,
+                     const char* positionsPath,
                      const char* energyPath,
                      const char* momentumPath) {
   const int n = (int)masses.size();
   const double frameLength = 1.0 / frameRate;
-  StateRecorder stateRecorder(outPath, energyPath, momentumPath);
+  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath);
   double curFrameAcc = 0;
 #ifdef LEAPFROG
   // set v_(1/2)

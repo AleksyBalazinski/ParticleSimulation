@@ -42,7 +42,7 @@ class PMMethod {
                   InterpolationScheme is = InterpolationScheme::NGP,
                   const double G = 1,
                   const int frameRate = 30,
-                  const char* outPath = "output.txt",
+                  const char* positionsPath = "output.txt",
                   const char* energyPath = "energy.txt",
                   const char* momentumPath = "momentum.txt");
 };
