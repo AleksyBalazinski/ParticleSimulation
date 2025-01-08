@@ -194,6 +194,9 @@ Vec3 PMMethod::getFieldAtMeshpoint(double x, double y, double z, InterpolationSc
              tx * dy * dz * grid.getField(xi, yi + 1, zi + 1) +
              dx * dy * dz * grid.getField(xi + 1, yi + 1, zi + 1);
     }
+
+    default:
+      throw std::invalid_argument("Unkown interpolation scheme");
   }
 }
 
