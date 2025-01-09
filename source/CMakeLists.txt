@@ -23,3 +23,8 @@ target_include_directories(ParticleSimulationLib
 PUBLIC 
 ${PROJECT_SOURCE_DIR}/include
 )
+
+target_link_libraries(ParticleSimulationLib PUBLIC
+	pocketfft
+	kissfft
+)

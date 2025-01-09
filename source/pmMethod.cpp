@@ -95,6 +95,23 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
         auto fieldY = -0.5 * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
         auto fieldZ = -0.5 * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
 
+        // double alpha = 4.0 / 3;
+        // auto fieldX =
+        //     (-1.0 / 12) * (-grid.getPotential(x + 2, y, z) + 8 * grid.getPotential(x +
+        //     1, y, z) -
+        //                    8 * grid.getPotential(x - 1, y, z) + grid.getPotential(x -
+        //                    2, y, z));
+        // auto fieldY =
+        //     (-1.0 / 12) * (-grid.getPotential(x, y + 2, z) + 8 * grid.getPotential(x, y
+        //     + 1, z) -
+        //                    8 * grid.getPotential(x, y - 1, z) + grid.getPotential(x, y
+        //                    - 2, z));
+        // auto fieldZ =
+        //     (-1.0 / 12) * (-grid.getPotential(x, y, z + 2) + 8 * grid.getPotential(x,
+        //     y, z + 1) -
+        //                    8 * grid.getPotential(x, y, z - 1) + grid.getPotential(x, y,
+        //                    z - 2));
+
         Vec3 fieldStrength(fieldX, fieldY, fieldZ);
         grid.assignField(x, y, z, fieldStrength);
       });
