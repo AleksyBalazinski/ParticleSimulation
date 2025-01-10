@@ -6,7 +6,7 @@
 	pmMethod.cpp
 	simInfo.cpp
 	grid.cpp
-	unit_conversions.cpp
+	unitConversions.cpp
 	)
 
 target_include_directories(ParticleSimulation PRIVATE ${PROJECT_SOURCE_DIR}/include)

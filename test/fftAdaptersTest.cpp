@@ -10,15 +10,15 @@ TEST(pocketfftAdapter, forwardAndBackward) {
   std::vector<std::complex<float>> original = {1, 2, 3, 4, 5, 6, 7, 8};
   std::vector<std::complex<float>> transformed(8, 0.0f);
   PocketfftAdapter<float> adapter(dims, ndim);
+
   adapter.fft(original, transformed);
-  for (auto& e : transformed) {
-    std::cerr << e << ' ';
-  }
-  std::cerr << '\n';
+
   std::vector<std::complex<float>> invTransformed(8, 0.0f);
   adapter.ifft(transformed, invTransformed);
-  for (auto& e : invTransformed) {
-    std::cerr << e << ' ';
+
+  for (int i = 0; i < original.size(); ++i) {
+    ASSERT_NEAR(invTransformed[i].real(), original[i].real(), 1e-6);
+    ASSERT_NEAR(invTransformed[i].imag(), original[i].imag(), 1e-6);
   }
 }
 
@@ -28,14 +28,14 @@ TEST(kissFFTApapter, forwardAndBackward) {
   std::vector<std::complex<float>> original = {1, 2, 3, 4, 5, 6, 7, 8};
   std::vector<std::complex<float>> transformed(8, 0.0f);
   KissFFTAdapter<float> adapter(dims, ndim);
+
   adapter.fft(original, transformed);
-  for (auto& e : transformed) {
-    std::cerr << e << ' ';
-  }
-  std::cerr << '\n';
+
   std::vector<std::complex<float>> invTransformed(8, 0.0f);
   adapter.ifft(transformed, invTransformed);
-  for (auto& e : invTransformed) {
-    std::cerr << e << ' ';
+
+  for (int i = 0; i < original.size(); ++i) {
+    ASSERT_NEAR(invTransformed[i].real(), original[i].real(), 1e-6);
+    ASSERT_NEAR(invTransformed[i].imag(), original[i].imag(), 1e-6);
   }
 }

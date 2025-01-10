@@ -10,7 +10,7 @@
 #include "grid.h"
 #include "simInfo.h"
 #include "stateRecorder.h"
-#include "unit_conversions.h"
+#include "unitConversions.h"
 #include "vec3.h"
 
 // #define DEBUG
@@ -67,7 +67,7 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations,
                   auto sx = std::sin(std::numbers::pi * kx / dim);
                   auto sy = std::sin(std::numbers::pi * ky / dim);
                   auto sz = std::sin(std::numbers::pi * kz / dim);
-                  double G = -0.25 / (sx * sx + sy * sy + sz * sz);
+                  auto G = static_cast<float>(-0.25 / (sx * sx + sy * sy + sz * sz));
 
                   auto densityFourier = grid.getDensityFourier(kx, ky, kz);
                   auto potentialFourier =

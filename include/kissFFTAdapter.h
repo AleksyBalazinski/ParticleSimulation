@@ -28,9 +28,8 @@ class KissFFTAdapter : public FFTAdapter<T> {
     kiss_fftnd(cfgInv, reinterpret_cast<kiss_fft_cpx*>(in.data()),
                reinterpret_cast<kiss_fft_cpx*>(out.data()));
 
-    std::for_each(std::execution::par, out.begin(), out.end(), [length = length](CpxT& x) {
-      x /= static_cast<CpxT>(length);
-    });  // TODO fix this warning
+    std::for_each(std::execution::par, out.begin(), out.end(),
+                  [length = static_cast<T>(length)](CpxT& x) { x /= length; });
     return out;
   }
 };

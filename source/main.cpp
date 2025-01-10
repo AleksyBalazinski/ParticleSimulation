@@ -4,7 +4,6 @@
 #include <string>
 #include "kissFFTAdapter.h"
 #include "pmMethod.h"
-#include "pocketfftAdapter.h"
 #include "ppMethod.h"
 #include "utils.h"
 
@@ -24,9 +23,7 @@ int main() {
   KissFFTAdapter<float> fftAdapter(dims, 3);
 
   PMMethod pm(gridPoints, fftAdapter);
-  pm.run(state, masses, 15.0, 0.05, 2.0,
-         InterpolationScheme::CIC);  // NOTE: increasing H leads to better energy conservation ->
-                                     // why???
+  pm.run(state, masses, 15.0, 0.05, 2.0, InterpolationScheme::CIC);
   // ppMethod(state, masses, 10.0);
 
   // glfwInit();
