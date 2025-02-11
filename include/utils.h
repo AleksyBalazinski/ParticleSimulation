@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <random>
 #include <vector>
 #include "vec3.h"
@@ -49,4 +50,20 @@ std::vector<double> randomMasses(int particlesCnt, std::pair<double, double> mas
   }
 
   return masses;
+}
+
+double newton(std::function<double(double)> f,
+              std::function<double(double)> df,
+              double guess,
+              int maxIter,
+              double tolerance) {
+  int i = 0;
+  double err = tolerance + 1;
+  double x = guess;
+  while (err > tolerance && i < maxIter) {
+    ++i;
+    x = x - f(x) / df(x);
+  }
+
+  return x;
 }

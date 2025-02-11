@@ -1,16 +1,9 @@
-﻿#include <chrono>
-#include <cmath>
-#include <iostream>
-#include <string>
+﻿#include <iostream>
+#include "grid.h"
 #include "kissFFTAdapter.h"
 #include "pmMethod.h"
 #include "ppMethod.h"
 #include "utils.h"
-
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-
-void framebufferSizeCallback(GLFWwindow* window, int width, int height);
 
 int main() {
   const int N = 2;
@@ -22,52 +15,9 @@ int main() {
   int dims[] = {gridPoints, gridPoints, gridPoints};
   KissFFTAdapter<float> fftAdapter(dims, 3);
 
-  PMMethod pm(gridPoints, fftAdapter);
-  pm.run(state, masses, 15.0, 0.05, 2.0, InterpolationScheme::CIC);
-  // ppMethod(state, masses, 10.0);
-
-  // glfwInit();
-  // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-
-  // GLFWwindow* window = glfwCreateWindow(800, 600, "LearnOpenGL", NULL, NULL);
-  // if (window == nullptr) {
-  //   std::cerr << "Failed to create GLFW window\n";
-  //   glfwTerminate();
-  //   return -1;
-  // }
-  // glfwMakeContextCurrent(window);
-
-  // GLenum err = glewInit();
-  // if (err != GLEW_OK) {
-  //   std::cerr << "Error: " << glewGetErrorString(err) << '\n';
-  //   glfwTerminate();
-  //   return -1;
-  // }
-
-  // glViewport(0, 0, 800, 600);
-  // glfwSetFramebufferSizeCallback(window, framebufferSizeCallback);
-
-  // float vertices[] = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f};
-
-  // unsigned int VBO;
-  // glGenBuffers(1, &VBO);  // generate buffer object
-  // glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-  // // render loop
-  // while (!glfwWindowShouldClose(window)) {
-  //   glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-  //   glClear(GL_COLOR_BUFFER_BIT);
-
-  //   glfwSwapBuffers(window);
-  //   glfwPollEvents();
-  // }
-
-  // glfwTerminate();
-}
-
-void framebufferSizeCallback(GLFWwindow* window, int width, int height) {
-  glViewport(0, 0, width, height);
+  Grid grid(gridPoints, fftAdapter);
+  PMMethod pm(state, masses, 1, 0.1, 1, InterpolationScheme::CIC, FiniteDiffScheme::TWO_POINT,
+              grid);
+  pm.run(200);
+  // ppMethod(state, masses, /*sim length*/ 200, /*step size*/ 0.1, /*G*/ 1);
 }

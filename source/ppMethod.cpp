@@ -41,17 +41,14 @@ void setIntegerVelocities(const std::vector<Vec3>& state,
 
 std::string ppMethod(std::vector<Vec3>& state,
                      std::vector<double>& masses,
-                     const double simLengthSeconds,
+                     const int simLength,
                      const double stepSize,
                      const double G,
-                     const int frameRate,
                      const char* positionsPath,
                      const char* energyPath,
                      const char* momentumPath) {
   const int n = (int)masses.size();
-  const double frameLength = 1.0 / frameRate;
   StateRecorder stateRecorder(positionsPath, energyPath, momentumPath);
-  double curFrameAcc = 0;
 #ifdef LEAPFROG
   // set v_(1/2)
   // from this point on state[n + i] holds velocities at half-step
@@ -66,30 +63,27 @@ std::string ppMethod(std::vector<Vec3>& state,
 
   RK4Stepper<Vec3> stepper(system, 2 * n);
 #endif
-  for (double t = 0; t <= simLengthSeconds; t += stepSize) {
+  for (double t = 0; t <= simLength; ++t) {
 #ifdef LEAPFROG
     for (int i = 0; i < n; i++) {
       state[i] += stepSize * state[n + i];
     }
 #endif
-    if (curFrameAcc <= 0) {
-#ifdef LEAPFROG
-      setIntegerVelocities(state, masses, G, stepSize, velocities);
-      stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
-                                 kineticEnergy(velocities.begin(), velocities.end(), masses, G));
-#else
-      stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
-                                 kineticEnergy(state.begin() + n, state.end(), masses, G));
-#endif
-      stateRecorder.recordPositions(state.begin(), state.begin() + n);
 
 #ifdef LEAPFROG
-      stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
-#else
-      stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
+    setIntegerVelocities(state, masses, G, stepSize, velocities);
+    stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
+                               kineticEnergy(velocities.begin(), velocities.end(), masses, G));
 #endif
-      curFrameAcc = frameLength;
-    }
+    stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
+                               kineticEnergy(state.begin() + n, state.end(), masses, G));
+    stateRecorder.recordPositions(state.begin(), state.begin() + n);
+
+#ifdef LEAPFROG
+    stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
+#endif
+    stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
+
 #ifdef LEAPFROG
     for (int i = 0; i < n; i++) {
       state[n + i] += stepSize * acceleration(i, state, masses, G);
@@ -97,8 +91,6 @@ std::string ppMethod(std::vector<Vec3>& state,
 #else
     stepper.doStep(state, stepSize);
 #endif
-
-    curFrameAcc -= stepSize;
   }
 
   return stateRecorder.flush();
