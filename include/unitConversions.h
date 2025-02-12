@@ -6,6 +6,8 @@ Vec3 positionToCodeUntits(const Vec3& pos, double H);
 
 Vec3 velocityToCodeUntits(const Vec3& v, double H, double DT);
 
+Vec3 accelerationToCodeUnits(const Vec3& a, double H, double DT);
+
 double densityToCodeUnits(double density, double DT, double G);
 
 void stateToCodeUnits(std::vector<Vec3>& state, double H, double DT);

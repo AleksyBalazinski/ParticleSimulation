@@ -3,11 +3,9 @@ import numpy as np
 import math
 import sys
 
-# Initialize limits
 pos_max = [-math.inf] * 3
 pos_min = [math.inf] * 3
 
-# Function to update position limits
 def update_limits(position):
     for i in range(3):
         if position[i] > pos_max[i]:
@@ -15,7 +13,6 @@ def update_limits(position):
         if position[i] < pos_min[i]:
             pos_min[i] = position[i]
 
-# Function to load data
 def load_data(filename):
     frames = []
     with open(filename, 'r') as f:
@@ -33,28 +30,33 @@ def load_data(filename):
     print(f"Total frames loaded: {len(frames)}")
     return frames
 
-# Load the data from the file specified as a command-line argument
 frames = load_data(sys.argv[1])
 
-# Extract the last frame
 last_frame = frames[-1]
+x = last_frame[:, 0]
+y = last_frame[:, 1]
+z = last_frame[:, 2]
 
-# Create the plot
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
+ax.set_xlim(0, 60)
+ax.set_ylim(0, 60)
+# ax.set_zlim([pos_min[2], pos_max[2]])
+ax.set_zlim(0, 60)
 
-# Set axis limits based on the data
-ax.set_xlim([pos_min[0], pos_max[0]])
-ax.set_ylim([pos_min[1], pos_max[1]])
-ax.set_zlim([pos_min[2], pos_max[2]])
-
-# Set axis labels
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_zlabel('Z')
 
-# Plot the last frame
-ax.scatter(last_frame[:, 0], last_frame[:, 1], last_frame[:, 2], color='blue', s=20)
+ax.scatter(x, y, z, s=1)
 
-# Display the plot
+plt.show()
+
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(8, 8))
+plt.scatter(x, y, c='blue', marker='o', alpha=0.7, s=1)
+plt.xlim(0, 60)
+plt.ylim(0, 60)  
+plt.grid(True) 
 plt.show()

@@ -10,6 +10,10 @@ Vec3 velocityToCodeUntits(const Vec3& v, double H, double DT) {
   return DT * v / H;
 }
 
+Vec3 accelerationToCodeUnits(const Vec3& a, double H, double DT) {
+  return DT * DT * a / H;
+}
+
 double densityToCodeUnits(double density, double DT, double G) {
   return DT * DT * 4 * std::numbers::pi * G * density;
 }

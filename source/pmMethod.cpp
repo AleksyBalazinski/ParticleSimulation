@@ -5,9 +5,9 @@
 #include <complex>
 #include <execution>
 #include <iostream>
+#include <numbers>
 #include <ranges>
 #include <stdexcept>
-#include <tuple>
 #include "grid.h"
 #include "simInfo.h"
 #include "stateRecorder.h"
@@ -26,11 +26,7 @@ bool isWithingBox(const Vec3& pos, double boxSize) {
          pos.z <= boxSize;
 }
 
-std::tuple<double, double, double> getFieldInCell(int x,
-                                                  int y,
-                                                  int z,
-                                                  FiniteDiffScheme fds,
-                                                  Grid& grid) {
+Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, Grid& grid) {
   double fieldX, fieldY, fieldZ;
 
   if (fds == FiniteDiffScheme::TWO_POINT) {
@@ -49,7 +45,7 @@ std::tuple<double, double, double> getFieldInCell(int x,
     throw std::invalid_argument("Uknown finite difference type");
   }
 
-  return std::make_tuple(fieldX, fieldY, fieldZ);
+  return Vec3(fieldX, fieldY, fieldZ);
 }
 
 void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecorder& sr) {
@@ -121,7 +117,7 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
 
   // acceleration calculation
   for (int i = 0; i < n; ++i) {
-    accelerations[i] = getField(state[i].x, state[i].y, state[i].z);
+    accelerations[i] = getField(state[i].x, state[i].y, state[i].z) + externalField(state[i]);
   }
 #ifdef DEBUG
   auto endAll = std::chrono::steady_clock::now();
@@ -227,6 +223,21 @@ void setIntegerVelocities(std::vector<Vec3>& intVs,
   }
 }
 
+PMMethod::PMMethod(std::vector<Vec3>& state,
+                   std::vector<double>& masses,
+                   std::function<Vec3(Vec3)> externalField,
+                   double H,
+                   double DT,
+                   double G,
+                   InterpolationScheme is,
+                   FiniteDiffScheme fds,
+                   Grid& grid)
+    : state(state), masses(masses), H(H), DT(DT), G(G), is(is), fds(fds), grid(grid) {
+  this->externalField = [DT, H, externalField](Vec3 pos) -> Vec3 {
+    return accelerationToCodeUnits(externalField(positionToOriginalUnits(pos, H)), H, DT);
+  };
+}
+
 std::string PMMethod::run(const int simLength,
                           const char* positionsPath,
                           const char* energyPath,
@@ -258,10 +269,11 @@ std::string PMMethod::run(const int simLength,
     velocitiesToOriginalUnits(velocities, H, DT);
 
     stateRecorder.recordPositions(state.begin(), state.begin() + n);
-    stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
-                               kineticEnergy(velocities.begin(), velocities.end(), masses, G));
+    // stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
+    //                            kineticEnergy(velocities.begin(), velocities.end(), masses, G));
 
-    stateRecorder.recordTotalMomentum(totalMomentum(velocities.begin(), velocities.end(), masses));
+    // stateRecorder.recordTotalMomentum(totalMomentum(velocities.begin(), velocities.end(),
+    // masses));
 
     stateToCodeUnits(state, H, DT);
     velocitiesToCodeUnits(velocities, H, DT);

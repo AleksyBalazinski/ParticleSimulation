@@ -1,7 +1,6 @@
 #pragma once
 
-#include <numbers>
-#include <string>
+#include <functional>
 #include <vector>
 #include "grid.h"
 #include "stateRecorder.h"
@@ -15,6 +14,7 @@ class PMMethod {
   Grid& grid;
   std::vector<Vec3>& state;
   std::vector<double>& masses;
+  std::function<Vec3(Vec3)> externalField;
   double H;
   double DT;
   double G;
@@ -29,13 +29,13 @@ class PMMethod {
  public:
   PMMethod(std::vector<Vec3>& state,
            std::vector<double>& masses,
+           std::function<Vec3(Vec3)> externalField,
            double H,
            double DT,
            double G,
            InterpolationScheme is,
            FiniteDiffScheme fds,
-           Grid& grid)
-      : state(state), masses(masses), H(H), DT(DT), G(G), is(is), fds(fds), grid(grid) {};
+           Grid& grid);
 
   std::string run(const int simLength,
                   const char* positionsPath = "output.txt",

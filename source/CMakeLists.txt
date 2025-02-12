@@ -7,6 +7,9 @@
 	simInfo.cpp
 	grid.cpp
 	unitConversions.cpp
+	sphericalSampler.cpp
+	utils.cpp
+	diskSampler.cpp
 )
 
 target_include_directories(ParticleSimulation
