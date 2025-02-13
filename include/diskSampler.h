@@ -12,6 +12,12 @@ class DiskSampler {
  public:
   DiskSampler();
 
-  std::vector<Vec3>
-  sample(Vec3 center, double rb, double mb, double rd, double md, double G, int n);
+  std::vector<Vec3> sample(Vec3 center,
+                           double rb,
+                           double mb,
+                           double rd,
+                           double md,
+                           double thickness,
+                           double G,
+                           int n);
 };

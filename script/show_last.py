@@ -48,14 +48,20 @@ ax.set_xlabel('X')
 ax.set_ylabel('Y')
 ax.set_zlabel('Z')
 
-ax.scatter(x, y, z, s=1)
+ax.scatter(x, y, z, s=0.1)
 
 plt.show()
 
 import matplotlib.pyplot as plt
 
 plt.figure(figsize=(8, 8))
-plt.scatter(x, y, c='blue', marker='o', alpha=0.7, s=1)
+plt.scatter(x, y, c='blue', marker='o', alpha=0.5, s=0.1)
+plt.xlim(0, 60)
+plt.ylim(0, 60)  
+plt.grid(True) 
+plt.show()
+
+plt.scatter(x, z, c='blue', marker='o', alpha=0.5, s=0.1)
 plt.xlim(0, 60)
 plt.ylim(0, 60)  
 plt.grid(True) 

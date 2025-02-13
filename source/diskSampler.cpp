@@ -42,19 +42,26 @@ Vec3 DiskSampler::getVelocity(Vec3 pos,
 
 DiskSampler::DiskSampler() : re(std::random_device{}()) {}
 
-std::vector<Vec3>
-DiskSampler::sample(Vec3 center, double rb, double mb, double rd, double md, double G, int n) {
+std::vector<Vec3> DiskSampler::sample(Vec3 center,
+                                      double rb,
+                                      double mb,
+                                      double rd,
+                                      double md,
+                                      double thickness,
+                                      double G,
+                                      int n) {
   std::uniform_real_distribution<double> u(0, 1);
   std::vector<Vec3> state(2 * n);
 
   for (int i = 0; i < n; ++i) {
     double phi = u(re) * 2 * std::numbers::pi;
-    double r = rd * std::sqrt(u(re));
+    double r = 0.97 * rd * std::sqrt(u(re));
 
     double x = r * std::cos(phi);
     double y = r * std::sin(phi);
+    double z = (thickness / 2) * (2 * u(re) - 1);
 
-    state[i] = center + Vec3(x, y, 0);
+    state[i] = center + Vec3(x, y, z);
     state[n + i] = getVelocity(state[i], center, rb, mb, rd, md, G);
   }
 
