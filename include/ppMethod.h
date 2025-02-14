@@ -1,9 +1,6 @@
 #pragma once
 
-#include <string>
 #include <vector>
-#include "RK4Stepper.h"
-#include "stateRecorder.h"
 #include "vec3.h"
 
 std::string ppMethod(std::vector<Vec3>& state,

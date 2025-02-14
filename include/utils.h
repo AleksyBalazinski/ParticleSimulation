@@ -1,9 +1,6 @@
 #pragma once
 
-#include <cmath>
 #include <functional>
-#include <numbers>
-#include <random>
 #include <vector>
 #include "vec3.h"
 

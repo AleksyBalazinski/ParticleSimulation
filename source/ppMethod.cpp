@@ -1,6 +1,8 @@
 #include "ppMethod.h"
 #include <cmath>
+#include "RK4Stepper.h"
 #include "simInfo.h"
+#include "stateRecorder.h"
 
 // #define LEAPFROG
 

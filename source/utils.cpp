@@ -1,4 +1,5 @@
 #include "utils.h"
+#include <random>
 
 std::vector<Vec3> randomInitialState(int particlesCnt,
                                      std::pair<Vec3, Vec3> initalPositionRange,
