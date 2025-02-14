@@ -10,6 +10,7 @@ FetchContent_MakeAvailable(gtest)
 add_executable(
     unit_tests
     RK4Test.cpp
+    fftAdaptersTest.cpp
     )
 
 target_link_libraries(unit_tests

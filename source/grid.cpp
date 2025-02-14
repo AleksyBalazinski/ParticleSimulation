@@ -1,5 +1,4 @@
 #include "grid.h"
-#include <kiss_fftnd.h>
 #include <algorithm>
 #include <complex>
 
@@ -40,11 +39,7 @@ const std::vector<std::complex<float>>& Grid::fftDensity() {
 }
 
 const std::vector<std::complex<float>>& Grid::invFftPotential() {
-  fftAdapter.ifft(potentialFourier, potential);
-  for (int i = 0; i < length; i++) {
-    potential[i] /= length;
-  }
-  return potential;
+  return fftAdapter.ifft(potentialFourier, potential);
 }
 
 void Grid::setPotentialFourier(int i, int j, int k, std::complex<float> value) {

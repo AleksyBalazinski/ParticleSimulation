@@ -22,7 +22,6 @@ TEST(rk4stepper, harmonicOscillator) {
   for (int i = 0; i < stepsCnt; i++) {
     stepper.doStep(x, step);
   }
-  std::cerr << x[0] << ' ' << x[1] << '\n';
   ASSERT_NEAR(x[0], -3.0, 1.0e-3);
   ASSERT_NEAR(x[1], 0.0, 1.0e-3);
 }

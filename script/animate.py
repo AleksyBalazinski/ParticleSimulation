@@ -29,10 +29,11 @@ def load_data(filename):
                 block = []
         if block:
             frames.append(np.array(block))
+    print(len(frames))
     return frames
 
 frames = load_data(sys.argv[1])
-
+print(f"x: ({pos_min[0]}, {pos_max[0]}), y: ({pos_min[1]}, {pos_max[1]}), z: ({pos_min[2]}, {pos_max[2]})")
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 
@@ -40,7 +41,7 @@ ax.set_xlim([pos_min[0], pos_max[0]])
 ax.set_ylim([pos_min[1], pos_max[1]])
 ax.set_zlim([pos_min[2], pos_max[2]])
 
-scat = ax.scatter([], [], [], s=20)
+scat = ax.scatter([], [], [], s=1)
 
 def update(frame):
     ax.clear()
@@ -50,7 +51,7 @@ def update(frame):
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
-    scat = ax.scatter(frame[:, 0], frame[:, 1], frame[:, 2], color='blue', s=20)
+    scat = ax.scatter(frame[:, 0], frame[:, 1], frame[:, 2], color='blue', s=1)
     return scat,
 
 ani = animation.FuncAnimation(fig, update, frames=frames, interval=100)
@@ -60,4 +61,4 @@ def inicate_progress(i, n):
     sys.stdout.write(f'\rSaving frame {i + 1}/{n}')
     sys.stdout.flush()
 
-ani.save('./animations/particles_animation.mp4', writer='ffmpeg', fps=30, progress_callback=lambda i, n: inicate_progress(i, n))  # Save as MP4
+ani.save('./animations/particles_animation.mp4', writer='ffmpeg', fps=10, progress_callback=lambda i, n: inicate_progress(i, n))  # Save as MP4
