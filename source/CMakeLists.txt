@@ -10,6 +10,7 @@
 	sphericalSampler.cpp
 	utils.cpp
 	diskSampler.cpp
+	diskSamplerLinear.cpp
 )
 
 target_include_directories(ParticleSimulation

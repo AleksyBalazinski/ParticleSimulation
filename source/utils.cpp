@@ -59,3 +59,22 @@ Vec3 externalFieldBulge(Vec3 pos, Vec3 bulge, double rb, double mb, double G) {
 
   return g * dir;
 }
+
+double newton(std::function<double(double)> f,
+              std::function<double(double)> df,
+              double guess,
+              int maxIter,
+              double tolerance) {
+  int i = 0;
+  double err = tolerance + 1;
+  double x = guess;
+  double xPrev;
+  while (err > tolerance && i < maxIter) {
+    ++i;
+    xPrev = x;
+    x = x - f(x) / df(x);
+    err = std::abs(x - xPrev);
+  }
+
+  return x;
+}

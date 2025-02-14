@@ -14,3 +14,9 @@ std::vector<Vec3> randomInitialState(int particlesCnt,
 std::vector<double> randomMasses(int particlesCnt, std::pair<double, double> massRange);
 
 Vec3 externalFieldBulge(Vec3 pos, Vec3 bulge, double rb, double mb, double G);
+
+double newton(std::function<double(double)> f,
+              std::function<double(double)> df,
+              double guess,
+              int maxIter,
+              double tolerance);

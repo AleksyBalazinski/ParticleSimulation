@@ -2,25 +2,6 @@
 #include <numbers>
 #include "utils.h"
 
-double SphericalSampler::newton(std::function<double(double)> f,
-                                std::function<double(double)> df,
-                                double guess,
-                                int maxIter,
-                                double tolerance) {
-  int i = 0;
-  double err = tolerance + 1;
-  double x = guess;
-  double xPrev;
-  while (err > tolerance && i < maxIter) {
-    ++i;
-    xPrev = x;
-    x = x - f(x) / df(x);
-    err = std::abs(x - xPrev);
-  }
-
-  return x;
-}
-
 SphericalSampler::SphericalSampler() : re(std::random_device{}()) {}
 
 std::vector<Vec3>

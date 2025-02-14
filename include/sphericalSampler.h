@@ -21,12 +21,6 @@ class SphericalSampler {
     return 12 * std::pow(r, 3) - 12 * rd * std::pow(r, 2);
   }
 
-  double newton(std::function<double(double)> f,
-                std::function<double(double)> df,
-                double guess,
-                int maxIter,
-                double tolerance);
-
  public:
   SphericalSampler();
 
