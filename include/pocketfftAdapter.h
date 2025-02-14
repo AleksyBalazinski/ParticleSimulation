@@ -36,7 +36,7 @@ class PocketfftAdapter : public FFTAdapter<T> {
     pocketfft::c2c(shape, stride, stride, axes, /*forward*/ false, in.data(), out.data(),
                    static_cast<T>(1.0));
 
-    std::for_each(std::execution::par, out.begin(), out.end(),
+    std::for_each(std::execution::par_unseq, out.begin(), out.end(),
                   [length = static_cast<T>(length)](CpxT& x) { x /= length; });
     return out;
   }

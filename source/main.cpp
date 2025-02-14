@@ -19,7 +19,7 @@ int main() {
   double mb = 15;
   double rd = 15;
   double md = 60;
-  double thickness = 0.0;
+  double thickness = 0.3;
   double G = 4.5e-3;
 
   DiskSamplerLinear diskSampler;
@@ -41,5 +41,5 @@ int main() {
   PMMethod pm(state, masses, externalField, H, DT, G, InterpolationScheme::CIC,
               FiniteDiffScheme::TWO_POINT, grid);
 
-  pm.run(90);
+  pm.run(200);
 }

@@ -74,7 +74,7 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
   int dim = grid.getGridPoints();
   grid.setPotentialFourier(0, 0, 0, std::complex<float>(0, 0));
   auto gridIdxRange = std::ranges::views::iota(0, dim * dim * dim);
-  std::for_each(std::execution::par, gridIdxRange.begin(), gridIdxRange.end(),
+  std::for_each(std::execution::par_unseq, gridIdxRange.begin(), gridIdxRange.end(),
                 [dim, this](int idx) {
                   int kx = idx / (dim * dim);
                   int ky = (idx / dim) % dim;
@@ -104,7 +104,7 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
 #endif
 
   // find field in a meshpoint
-  std::for_each(std::execution::par, gridIdxRange.begin(), gridIdxRange.end(),
+  std::for_each(std::execution::par_unseq, gridIdxRange.begin(), gridIdxRange.end(),
                 [dim, this](int idx) {
                   int x = idx / (dim * dim);
                   int y = (idx / dim) % dim;
@@ -116,9 +116,12 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
                 });
 
   // acceleration calculation
-  for (int i = 0; i < n; ++i) {
-    accelerations[i] = getField(state[i].x, state[i].y, state[i].z) + externalField(state[i]);
-  }
+  auto accIdxRange = std::ranges::views::iota(0, n);
+  std::for_each(std::execution::par_unseq, accIdxRange.begin(), accIdxRange.end(),
+                [this, &accelerations](int i) {
+                  accelerations[i] =
+                      getField(state[i].x, state[i].y, state[i].z) + externalField(state[i]);
+                });
 #ifdef DEBUG
   auto endAll = std::chrono::steady_clock::now();
 
@@ -239,6 +242,7 @@ PMMethod::PMMethod(std::vector<Vec3>& state,
 }
 
 std::string PMMethod::run(const int simLength,
+                          bool collectDiagnostics,
                           const char* positionsPath,
                           const char* energyPath,
                           const char* momentumPath) {
@@ -264,25 +268,34 @@ std::string PMMethod::run(const int simLength,
       state[i] += state[n + i];
     }
 
-    setIntegerVelocities(velocities, state, masses, G, 1, accelerations);
+    if (collectDiagnostics) {
+      setIntegerVelocities(velocities, state, masses, G, 1, accelerations);
+    }
     stateToOriginalUnits(state, H, DT);
-    velocitiesToOriginalUnits(velocities, H, DT);
+    if (collectDiagnostics) {
+      velocitiesToOriginalUnits(velocities, H, DT);
+    }
 
     stateRecorder.recordPositions(state.begin(), state.begin() + n);
-    // stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
-    //                            kineticEnergy(velocities.begin(), velocities.end(), masses, G));
+    if (collectDiagnostics) {
+      stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
+                                 kineticEnergy(velocities.begin(), velocities.end(), masses, G));
 
-    // stateRecorder.recordTotalMomentum(totalMomentum(velocities.begin(), velocities.end(),
-    // masses));
+      stateRecorder.recordTotalMomentum(
+          totalMomentum(velocities.begin(), velocities.end(), masses));
+    }
 
     stateToCodeUnits(state, H, DT);
-    velocitiesToCodeUnits(velocities, H, DT);
+    if (collectDiagnostics) {
+      velocitiesToCodeUnits(velocities, H, DT);
+    }
 
     updateAccelerations(accelerations, stateRecorder);
+
     // now that we have accelerations of all particles, we can predict motion
-    for (int i = 0; i < n; i++) {
-      state[n + i] += accelerations[i];
-    }
+    auto accIdxRange = std::ranges::views::iota(0, n);
+    std::for_each(std::execution::par_unseq, accIdxRange.begin(), accIdxRange.end(),
+                  [this, accelerations, n](int i) { state[n + i] += accelerations[i]; });
   }
 
 #ifdef DEBUG

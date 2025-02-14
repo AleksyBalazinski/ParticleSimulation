@@ -38,6 +38,7 @@ class PMMethod {
            Grid& grid);
 
   std::string run(const int simLength,
+                  bool collectDiagnostics = false,
                   const char* positionsPath = "output.txt",
                   const char* energyPath = "energy.txt",
                   const char* momentumPath = "momentum.txt");

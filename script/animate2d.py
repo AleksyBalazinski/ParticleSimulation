@@ -40,22 +40,25 @@ ax = fig.add_subplot(111)
 ax.set_xlim(0, 60)
 ax.set_ylim(0, 60)
 
-scat = ax.scatter([], [], alpha=0.5, s=0.1)
+time_step = 1  # 1 Myr per update
+time_elapsed = 0
 
-def update(frame):
+def update(frame_num):
+    global time_elapsed
     ax.clear()
     ax.set_xlim(0, 60)
     ax.set_ylim(0, 60)
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    scat = ax.scatter(frame[:, 0], frame[:, 1], color='blue', alpha=0.5, s=0.1)
+    ax.set_xlabel('x (kpc)')
+    ax.set_ylabel('y (kpc)')
+    ax.text(45, 55, f'Time: {frame_num * time_step} Myr', fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
+    scat = ax.scatter(frames[frame_num][:, 0], frames[frame_num][:, 1], color='blue', alpha=0.5, s=0.1)
     return scat,
 
-ani = animation.FuncAnimation(fig, update, frames=frames, interval=100)
+ani = animation.FuncAnimation(fig, update, frames=len(frames), interval=100)
 os.makedirs('./animations', exist_ok=True)
 
-def inicate_progress(i, n):
+def indicate_progress(i, n):
     sys.stdout.write(f'\rSaving frame {i + 1}/{n}')
     sys.stdout.flush()
 
-ani.save('./animations/particles_animation.mp4', writer='ffmpeg', fps=10, progress_callback=lambda i, n: inicate_progress(i, n))  # Save as MP4
+ani.save('./animations/particles_animation.mp4', writer='ffmpeg', fps=10, progress_callback=lambda i, n: indicate_progress(i, n))

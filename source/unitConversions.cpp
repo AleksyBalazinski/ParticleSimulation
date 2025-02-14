@@ -1,5 +1,6 @@
 #include "unitConversions.h"
 #include <algorithm>
+#include <execution>
 #include <numbers>
 
 Vec3 positionToCodeUntits(const Vec3& pos, double H) {
@@ -20,9 +21,9 @@ double densityToCodeUnits(double density, double DT, double G) {
 
 void stateToCodeUnits(std::vector<Vec3>& state, double H, double DT) {
   int N = (int)state.size() / 2;
-  std::transform(state.begin(), state.begin() + N, state.begin(),
+  std::transform(std::execution::par_unseq, state.begin(), state.begin() + N, state.begin(),
                  [H](const Vec3& pos) { return positionToCodeUntits(pos, H); });
-  std::transform(state.begin() + N, state.end(), state.begin() + N,
+  std::transform(std::execution::par_unseq, state.begin() + N, state.end(), state.begin() + N,
                  [H, DT](const Vec3& v) { return velocityToCodeUntits(v, H, DT); });
 }
 
@@ -41,9 +42,9 @@ Vec3 velocityToOriginalUnits(const Vec3& v, double H, double DT) {
 
 void stateToOriginalUnits(std::vector<Vec3>& state, double H, double DT) {
   int N = (int)state.size() / 2;
-  std::transform(state.begin(), state.begin() + N, state.begin(),
+  std::transform(std::execution::par_unseq, state.begin(), state.begin() + N, state.begin(),
                  [H](const Vec3& pos) { return positionToOriginalUnits(pos, H); });
-  std::transform(state.begin() + N, state.end(), state.begin() + N,
+  std::transform(std::execution::par_unseq, state.begin() + N, state.end(), state.begin() + N,
                  [H, DT](const Vec3& v) { return velocityToOriginalUnits(v, H, DT); });
 }
 
