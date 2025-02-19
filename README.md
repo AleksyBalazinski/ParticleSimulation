@@ -28,7 +28,7 @@ python script/animate2d.py <output file path>
 ```
 For example (MSVC in Debug mode):
 ```bash
-python script/animate.py build/source/Debug/output.txt
+python script/animate2d.py build/source/Debug/output.txt
 ```
 
 ### Final positions

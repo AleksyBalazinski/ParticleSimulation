@@ -5,5 +5,5 @@ template <typename T>
 class AbstractStepper {
  public:
   virtual ~AbstractStepper() {}
-  virtual void doStep(std::vector<T>& x, double dt) = 0;
+  virtual void doStep(std::vector<T>& x, float dt) = 0;
 };

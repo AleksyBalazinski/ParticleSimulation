@@ -7,25 +7,19 @@ class DiskSamplerLinear {
  private:
   std::default_random_engine re;
 
-  Vec3 getVelocity(Vec3 pos, Vec3 center, double rb, double mb, double rd, double md, double G);
+  Vec3 getVelocity(Vec3 pos, Vec3 center, float rb, float mb, float rd, float md, float G);
 
-  double sampleFromLinear(double rd);
+  float sampleFromLinear(float rd);
 
-  inline double implicitInvCDFLinear(double r, double rd, double cdf) {
+  inline float implicitInvCDFLinear(float r, float rd, float cdf) {
     return 2 * std::pow(r, 3) - 3 * rd * r * r + cdf * std::pow(rd, 3);
   }
 
-  inline double implicitInvCDFLinearDer(double r, double rd) { return 6 * r * r - 6 * rd * r; }
+  inline float implicitInvCDFLinearDer(float r, float rd) { return 6 * r * r - 6 * rd * r; }
 
  public:
   DiskSamplerLinear();
 
-  std::vector<Vec3> sample(Vec3 center,
-                           double rb,
-                           double mb,
-                           double rd,
-                           double md,
-                           double thickness,
-                           double G,
-                           int n);
+  std::vector<Vec3>
+  sample(Vec3 center, float rb, float mb, float rd, float md, float thickness, float G, int n);
 };

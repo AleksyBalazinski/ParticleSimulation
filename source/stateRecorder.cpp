@@ -38,7 +38,7 @@ void StateRecorder::recordPositions(std::vector<Vec3>::iterator begin,
   saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
 }
 
-void StateRecorder::recordEnergy(double pe, double ke) {
+void StateRecorder::recordEnergy(float pe, float ke) {
   energyStr += std::to_string(pe) + ' ' + std::to_string(ke);
   energyStr += '\n';
   ++energyRecordsCnt;

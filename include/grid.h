@@ -25,7 +25,7 @@ class Grid {
  public:
   Grid(int gridPoints, FFTAdapter<float>& fftAdapter);
 
-  void assignDensity(int x, int y, int z, double density);
+  void assignDensity(int x, int y, int z, float density);
 
   void clearDensity();
 
@@ -45,5 +45,5 @@ class Grid {
 
   std::complex<float> getDensityFourier(int i, int j, int k) const;
 
-  double getPotential(int i, int j, int k) const;
+  float getPotential(int i, int j, int k) const;
 };

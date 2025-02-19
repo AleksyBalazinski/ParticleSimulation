@@ -34,7 +34,7 @@ class StateRecorder {
                 int maxRecords = 500);
   ~StateRecorder();
   void recordPositions(std::vector<Vec3>::iterator begin, std::vector<Vec3>::iterator end);
-  void recordEnergy(double pe, double ke);
+  void recordEnergy(float pe, float ke);
   void recordTotalMomentum(Vec3 momentum);
   std::string flush();
 };

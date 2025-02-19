@@ -13,26 +13,26 @@ class PMMethod {
  private:
   Grid& grid;
   std::vector<Vec3>& state;
-  std::vector<double>& masses;
+  std::vector<float>& masses;
   std::function<Vec3(Vec3)> externalField;
-  double H;
-  double DT;
-  double G;
+  float H;
+  float DT;
+  float G;
   InterpolationScheme is;
   FiniteDiffScheme fds;
 
   void reassignDensity();
-  Vec3 getField(double x, double y, double z);
+  Vec3 getField(float x, float y, float z);
 
   void updateAccelerations(std::vector<Vec3>& accelerations, StateRecorder& sr);
 
  public:
   PMMethod(std::vector<Vec3>& state,
-           std::vector<double>& masses,
+           std::vector<float>& masses,
            std::function<Vec3(Vec3)> externalField,
-           double H,
-           double DT,
-           double G,
+           float H,
+           float DT,
+           float G,
            InterpolationScheme is,
            FiniteDiffScheme fds,
            Grid& grid);

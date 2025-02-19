@@ -21,26 +21,26 @@ long long totalTimeMs = 0;
 long long fftTimeMs = 0;
 #endif
 
-bool isWithingBox(const Vec3& pos, double boxSize) {
+bool isWithingBox(const Vec3& pos, float boxSize) {
   return pos.x >= 0 && pos.x <= boxSize && pos.y >= 0 && pos.y <= boxSize && pos.z >= 0 &&
          pos.z <= boxSize;
 }
 
 Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, Grid& grid) {
-  double fieldX, fieldY, fieldZ;
+  float fieldX, fieldY, fieldZ;
 
   if (fds == FiniteDiffScheme::TWO_POINT) {
-    fieldX = -0.5 * (grid.getPotential(x + 1, y, z) - grid.getPotential(x - 1, y, z));
-    fieldY = -0.5 * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
-    fieldZ = -0.5 * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
+    fieldX = -0.5f * (grid.getPotential(x + 1, y, z) - grid.getPotential(x - 1, y, z));
+    fieldY = -0.5f * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
+    fieldZ = -0.5f * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
   } else if (fds == FiniteDiffScheme::FOUR_POINT) {
-    double alpha = 4.0 / 3;
-    fieldX = (-1.0 / 12) * (-grid.getPotential(x + 2, y, z) + 8 * grid.getPotential(x + 1, y, z) -
-                            8 * grid.getPotential(x - 1, y, z) + grid.getPotential(x - 2, y, z));
-    fieldY = (-1.0 / 12) * (-grid.getPotential(x, y + 2, z) + 8 * grid.getPotential(x, y + 1, z) -
-                            8 * grid.getPotential(x, y - 1, z) + grid.getPotential(x, y - 2, z));
-    fieldZ = (-1.0 / 12) * (-grid.getPotential(x, y, z + 2) + 8 * grid.getPotential(x, y, z + 1) -
-                            8 * grid.getPotential(x, y, z - 1) + grid.getPotential(x, y, z - 2));
+    float alpha = 4.0f / 3;
+    fieldX = (-1.0f / 12) * (-grid.getPotential(x + 2, y, z) + 8 * grid.getPotential(x + 1, y, z) -
+                             8 * grid.getPotential(x - 1, y, z) + grid.getPotential(x - 2, y, z));
+    fieldY = (-1.0f / 12) * (-grid.getPotential(x, y + 2, z) + 8 * grid.getPotential(x, y + 1, z) -
+                             8 * grid.getPotential(x, y - 1, z) + grid.getPotential(x, y - 2, z));
+    fieldZ = (-1.0f / 12) * (-grid.getPotential(x, y, z + 2) + 8 * grid.getPotential(x, y, z + 1) -
+                             8 * grid.getPotential(x, y, z - 1) + grid.getPotential(x, y, z - 2));
   } else {
     throw std::invalid_argument("Uknown finite difference type");
   }
@@ -54,8 +54,9 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
 #endif
   int n = (int)masses.size();
   if (int boxSize = grid.getGridPoints();
-      std::any_of(state.begin(), state.begin() + n,
-                  [boxSize](const Vec3 pos) { return !isWithingBox(pos, boxSize); })) {
+      std::any_of(state.begin(), state.begin() + n, [boxSize](const Vec3 pos) {
+        return !isWithingBox(pos, static_cast<float>(boxSize));
+      })) {
     sr.flush();
     throw std::runtime_error("A particle moved outside the computational box.");
   }
@@ -82,10 +83,10 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
                   if (kx == 0 && ky == 0 && kz == 0) {
                     return;
                   }
-                  auto sx = std::sin(std::numbers::pi * kx / dim);
-                  auto sy = std::sin(std::numbers::pi * ky / dim);
-                  auto sz = std::sin(std::numbers::pi * kz / dim);
-                  auto G = static_cast<float>(-0.25 / (sx * sx + sy * sy + sz * sz));
+                  auto sx = std::sinf(std::numbers::pi_v<float> * kx / dim);
+                  auto sy = std::sinf(std::numbers::pi_v<float> * ky / dim);
+                  auto sz = std::sinf(std::numbers::pi_v<float> * kz / dim);
+                  auto G = -0.25f / (sx * sx + sy * sy + sz * sz);
 
                   auto densityFourier = grid.getDensityFourier(kx, ky, kz);
                   auto potentialFourier =
@@ -142,7 +143,7 @@ void PMMethod::reassignDensity() {
         int y = (int)std::round(state[i].y);
         int z = (int)std::round(state[i].z);
 
-        double vol = H * H * H;
+        float vol = H * H * H;
         grid.assignDensity(x, y, z, densityToCodeUnits(masses[i] / vol, DT, G));
       }
       return;
@@ -153,15 +154,15 @@ void PMMethod::reassignDensity() {
         int y = (int)state[i].y;
         int z = (int)state[i].z;
 
-        double vol = H * H * H;
-        double d = densityToCodeUnits(masses[i] / vol, DT, G);
+        float vol = H * H * H;
+        float d = densityToCodeUnits(masses[i] / vol, DT, G);
 
-        double dx = state[i].x - x;
-        double dy = state[i].y - y;
-        double dz = state[i].z - z;
-        double tx = 1 - dx;
-        double ty = 1 - dy;
-        double tz = 1 - dz;
+        float dx = state[i].x - x;
+        float dy = state[i].y - y;
+        float dz = state[i].z - z;
+        float tx = 1 - dx;
+        float ty = 1 - dy;
+        float tz = 1 - dz;
 
         grid.assignDensity(x, y, z, d * tx * ty * tz);
         grid.assignDensity(x + 1, y, z, d * dx * ty * tz);
@@ -179,7 +180,7 @@ void PMMethod::reassignDensity() {
   }
 }
 
-Vec3 PMMethod::getField(double x, double y, double z) {
+Vec3 PMMethod::getField(float x, float y, float z) {
   switch (is) {
     case InterpolationScheme::NGP: {
       int xi = (int)std::round(x);
@@ -192,12 +193,12 @@ Vec3 PMMethod::getField(double x, double y, double z) {
       int xi = (int)x;
       int yi = (int)y;
       int zi = (int)z;
-      double dx = x - xi;
-      double dy = y - yi;
-      double dz = z - zi;
-      double tx = 1 - dx;
-      double ty = 1 - dy;
-      double tz = 1 - dz;
+      float dx = x - xi;
+      float dy = y - yi;
+      float dz = z - zi;
+      float tx = 1 - dx;
+      float ty = 1 - dy;
+      float tz = 1 - dz;
 
       return tx * ty * tz * grid.getField(xi, yi, zi) +
              dx * ty * tz * grid.getField(xi + 1, yi, zi) +
@@ -216,22 +217,22 @@ Vec3 PMMethod::getField(double x, double y, double z) {
 
 void setIntegerVelocities(std::vector<Vec3>& intVs,
                           const std::vector<Vec3>& state,
-                          const std::vector<double>& masses,
-                          double G,
-                          double h,
+                          const std::vector<float>& masses,
+                          float G,
+                          float h,
                           const std::vector<Vec3>& accelerations) {
   int n = (int)intVs.size();
   for (int i = 0; i < n; i++) {
-    intVs[i] = state[n + i] + 0.5 * h * accelerations[i];
+    intVs[i] = state[n + i] + 0.5f * h * accelerations[i];
   }
 }
 
 PMMethod::PMMethod(std::vector<Vec3>& state,
-                   std::vector<double>& masses,
+                   std::vector<float>& masses,
                    std::function<Vec3(Vec3)> externalField,
-                   double H,
-                   double DT,
-                   double G,
+                   float H,
+                   float DT,
+                   float G,
                    InterpolationScheme is,
                    FiniteDiffScheme fds,
                    Grid& grid)
@@ -261,7 +262,7 @@ std::string PMMethod::run(const int simLength,
     state[n + i] += 0.5 * accelerations[i];
   }
 
-  for (double t = 0; t <= simLength; ++t) {
+  for (float t = 0; t <= simLength; ++t) {
     std::cout << "progress: " << float(t) / simLength << '\r';
     std::cout.flush();
     for (int i = 0; i < n; i++) {
