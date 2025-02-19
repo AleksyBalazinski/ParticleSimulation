@@ -42,7 +42,7 @@ Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, Grid& grid) {
     fieldZ = (-1.0f / 12) * (-grid.getPotential(x, y, z + 2) + 8 * grid.getPotential(x, y, z + 1) -
                              8 * grid.getPotential(x, y, z - 1) + grid.getPotential(x, y, z - 2));
   } else {
-    throw std::invalid_argument("Uknown finite difference type");
+    throw std::invalid_argument("Unknown finite difference type.");
   }
 
   return Vec3(fieldX, fieldY, fieldZ);
@@ -262,12 +262,12 @@ std::string PMMethod::run(const int simLength,
     state[n + i] += 0.5 * accelerations[i];
   }
 
-  for (float t = 0; t <= simLength; ++t) {
+  for (int t = 0; t <= simLength; ++t) {
     std::cout << "progress: " << float(t) / simLength << '\r';
     std::cout.flush();
-    for (int i = 0; i < n; i++) {
-      state[i] += state[n + i];
-    }
+    auto nIdxRange = std::ranges::views::iota(0, n);
+    std::for_each(std::execution::par_unseq, nIdxRange.begin(), nIdxRange.end(),
+                  [this, n](int i) { state[i] += state[n + i]; });
 
     if (collectDiagnostics) {
       setIntegerVelocities(velocities, state, masses, G, 1, accelerations);
@@ -294,8 +294,7 @@ std::string PMMethod::run(const int simLength,
     updateAccelerations(accelerations, stateRecorder);
 
     // now that we have accelerations of all particles, we can predict motion
-    auto accIdxRange = std::ranges::views::iota(0, n);
-    std::for_each(std::execution::par_unseq, accIdxRange.begin(), accIdxRange.end(),
+    std::for_each(std::execution::par_unseq, nIdxRange.begin(), nIdxRange.end(),
                   [this, accelerations, n](int i) { state[n + i] += accelerations[i]; });
   }
 
