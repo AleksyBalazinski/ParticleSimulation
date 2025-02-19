@@ -53,10 +53,9 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
   auto beginAll = std::chrono::steady_clock::now();
 #endif
   int n = (int)masses.size();
-  if (int boxSize = grid.getGridPoints();
-      std::any_of(state.begin(), state.begin() + n, [boxSize](const Vec3 pos) {
-        return !isWithingBox(pos, static_cast<float>(boxSize));
-      })) {
+  if (int boxSize = grid.getGridPoints(); std::any_of(
+          std::execution::par_unseq, state.begin(), state.begin() + n,
+          [boxSize](const Vec3 pos) { return !isWithingBox(pos, static_cast<float>(boxSize)); })) {
     sr.flush();
     throw std::runtime_error("A particle moved outside the computational box.");
   }
@@ -134,22 +133,23 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
 
 void PMMethod::reassignDensity() {
   int n = (int)masses.size();
+  auto nIdxRange = std::ranges::views::iota(0, n);
   grid.clearDensity();
 
   switch (is) {
     case InterpolationScheme::NGP:
-      for (int i = 0; i < n; i++) {
+      std::for_each(std::execution::par_unseq, nIdxRange.begin(), nIdxRange.end(), [this](int i) {
         int x = (int)std::round(state[i].x);
         int y = (int)std::round(state[i].y);
         int z = (int)std::round(state[i].z);
 
         float vol = H * H * H;
         grid.assignDensity(x, y, z, densityToCodeUnits(masses[i] / vol, DT, G));
-      }
+      });
       return;
 
     case InterpolationScheme::CIC:
-      for (int i = 0; i < n; i++) {
+      std::for_each(std::execution::par_unseq, nIdxRange.begin(), nIdxRange.end(), [this](int i) {
         int x = (int)state[i].x;
         int y = (int)state[i].y;
         int z = (int)state[i].z;
@@ -174,7 +174,7 @@ void PMMethod::reassignDensity() {
         grid.assignDensity(x, y + 1, z + 1, d * tx * dy * dz);
 
         grid.assignDensity(x + 1, y + 1, z + 1, d * dx * dy * dz);
-      }
+      });
 
       return;
   }
