@@ -5,7 +5,6 @@
 #include "common.h"
 #include "conversions.cuh"
 #include "disk_sampler_linear.cuh"
-#include "ext_field_bind.cuh"
 #include "state_recorder.cuh"
 #include "utils.cuh"
 
