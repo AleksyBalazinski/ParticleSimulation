@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include "ext_field_bind.cuh"
 #include "vec3.cuh"
 
 void pmMethod(std::vector<Vec3>& state,
