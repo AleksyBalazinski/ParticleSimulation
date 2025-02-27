@@ -6,7 +6,7 @@
 #include "vec3.cuh"
 
 int main() {
-  int simLength = 200;
+  int simLength = 150;
   Vec3 galaxyCenter(30, 30, 30);
   float rb = 3.0f;
   float mb = 15.0f;

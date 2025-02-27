@@ -11,6 +11,19 @@
 #define CELLS_CNT ((NG) * (NG) * (NG))
 #define NUM_BLOCKS(n) (((BLOCK_SIZE) + (n) - 1) / (BLOCK_SIZE))
 #define GRID_IDX(x, y, z) ((x) * (NG) * (NG) + (y) * (NG) + (z))
+#define GROUP_SIZE 2
+#define SMEM_IDX(x, y, z) ((x) * 10 * 10 + (y) * 10 + (z))
+
+#define cudaCheckErrors(msg)                                                                       \
+  do {                                                                                             \
+    cudaError_t __err = cudaGetLastError();                                                        \
+    if (__err != cudaSuccess) {                                                                    \
+      fprintf(stderr, "Fatal error: %s (%s at %s:%d)\n", msg, cudaGetErrorString(__err), __FILE__, \
+              __LINE__);                                                                           \
+      fprintf(stderr, "*** FAILED - ABORTING\n");                                                  \
+      exit(1);                                                                                     \
+    }                                                                                              \
+  } while (0)
 
 __device__ int mod(int a, int b) {
   return (a % b + b) % b;
@@ -25,29 +38,25 @@ bool isWithinBox(const Vec3 pos, float boxSize) {
          pos.z <= boxSize;
 }
 
-struct PDTableEntry {
-  int cellIdx;
-  cufftComplex density;
-};
-
 __global__ void reassignDensity(cufftComplex* gridDensity,
                                 Vec3* positions,
                                 float* masses,
                                 float H,
                                 float DT,
                                 float G) {
-  int idx = threadIdx.x + blockDim.x * blockIdx.x;
-  if (idx < N) {
-    int x = (int)positions[idx].x;
-    int y = (int)positions[idx].y;
-    int z = (int)positions[idx].z;
+  for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < N; idx += blockDim.x * gridDim.x) {
+    int particleIdx = idx;
+
+    int x = (int)positions[particleIdx].x;
+    int y = (int)positions[particleIdx].y;
+    int z = (int)positions[particleIdx].z;
 
     float vol = H * H * H;
-    float d = densityToCodeUnits(masses[idx] / vol, DT, G);
+    float d = densityToCodeUnits(masses[particleIdx] / vol, DT, G);
 
-    float dx = positions[idx].x - x;
-    float dy = positions[idx].y - y;
-    float dz = positions[idx].z - z;
+    float dx = positions[particleIdx].x - x;
+    float dy = positions[particleIdx].y - y;
+    float dz = positions[particleIdx].z - z;
     float tx = 1 - dx;
     float ty = 1 - dy;
     float tz = 1 - dz;
@@ -102,6 +111,15 @@ __device__ Vec3 getFieldInCell(int x, int y, int z, cufftComplex* gridPotential)
   return field;
 }
 
+__device__ Vec3 getFieldInCellSmem(int x, int y, int z, float smemPotential[10][10][10]) {
+  Vec3 field;
+  field.x = -0.5f * (smemPotential[x + 1][y][z] - smemPotential[x - 1][y][z]);
+  field.y = -0.5f * (smemPotential[x][y + 1][z] - smemPotential[x][y - 1][z]);
+  field.z = -0.5f * (smemPotential[x][y][z + 1] - smemPotential[x][y][z - 1]);
+
+  return field;
+}
+
 __global__ void scaleAfterInverse(cufftComplex* gridPotential) {
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < CELLS_CNT;
        idx += gridDim.x * blockDim.x) {
@@ -110,13 +128,69 @@ __global__ void scaleAfterInverse(cufftComplex* gridPotential) {
 }
 
 __global__ void findFieldInCells(Vec3* gridField, cufftComplex* gridPotential) {
-  for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < CELLS_CNT;
-       idx += gridDim.x * blockDim.x) {
-    int x = idx / (NG * NG);
-    int y = (idx / NG) % NG;
-    int z = idx % NG;
+  int blockSize = 8;
+  __shared__ float smem_potential[10][10][10];  // 10 = 8 + 2 = block_size + margin
+  int idx = threadIdx.x + blockDim.x * blockIdx.x;
+  int idy = threadIdx.y + blockDim.y * blockIdx.y;
+  int idz = threadIdx.z + blockDim.z * blockIdx.z;
+  int x = threadIdx.x + 1;
+  int y = threadIdx.y + 1;
+  int z = threadIdx.z + 1;
+  if ((idx < NG) && (idy < NG) && (idz < NG)) {
+    smem_potential[x][y][z] = gridPotential[GRID_IDX(idx, idy, idz)].x;
+    if (threadIdx.x == 0) {
+      smem_potential[0][y][z] = gridPotential[modIndex(idx - 1, idy, idz)].x;
+      smem_potential[9][y][z] = gridPotential[modIndex(idx + blockSize, idy, idz)].x;
+    }
+    if (threadIdx.y == 0) {
+      smem_potential[x][0][z] = gridPotential[modIndex(idx, idy - 1, idz)].x;
+      smem_potential[x][9][z] = gridPotential[modIndex(idx, idy + blockSize, idz)].x;
+    }
+    if (threadIdx.z == 0) {
+      smem_potential[x][y][0] = gridPotential[modIndex(idx, idy, idz - 1)].x;
+      smem_potential[x][y][9] = gridPotential[modIndex(idx, idy, idz + blockSize)].x;
+    }
+    if (threadIdx.x == 0 && threadIdx.y == 0) {
+      smem_potential[0][0][z] = gridPotential[modIndex(idx - 1, idy - 1, idz)].x;
+      smem_potential[0][9][z] = gridPotential[modIndex(idx - 1, idy + blockSize, idz)].x;
+      smem_potential[9][0][z] = gridPotential[modIndex(idx + blockSize, idy - 1, idz)].x;
+      smem_potential[9][9][z] = gridPotential[modIndex(idx + blockSize, idy + blockSize, idz)].x;
+    }
+    if (threadIdx.x == 0 && threadIdx.z == 0) {
+      smem_potential[0][y][0] = gridPotential[modIndex(idx - 1, idy, idz - 1)].x;
+      smem_potential[0][y][9] = gridPotential[modIndex(idx - 1, idy, idz + blockSize)].x;
+      smem_potential[9][y][0] = gridPotential[modIndex(idx + blockSize, idy, idz - 1)].x;
+      smem_potential[9][y][9] = gridPotential[modIndex(idx + blockSize, idy, idz + blockSize)].x;
+    }
+    if (threadIdx.y == 0 && threadIdx.z == 0) {
+      smem_potential[x][0][0] = gridPotential[modIndex(idx, idy - 1, idz - 1)].x;
+      smem_potential[x][0][9] = gridPotential[modIndex(idx, idy - 1, idz + blockSize)].x;
+      smem_potential[x][9][0] = gridPotential[modIndex(idx, idy + blockSize, idz - 1)].x;
+      smem_potential[x][9][9] = gridPotential[modIndex(idx, idy + blockSize, idz + blockSize)].x;
+    }
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+      smem_potential[0][0][0] = gridPotential[modIndex(idx - 1, idy - 1, idz - 1)].x;
+      smem_potential[0][0][9] = gridPotential[modIndex(idx - 1, idy - 1, idz + blockSize)].x;
+      smem_potential[0][9][0] = gridPotential[modIndex(idx - 1, idy + blockSize, idz - 1)].x;
+      smem_potential[9][0][0] = gridPotential[modIndex(idx + blockSize, idy - 1, idz - 1)].x;
+      smem_potential[0][9][9] =
+          gridPotential[modIndex(idx - 1, idy + blockSize, idz + blockSize)].x;
+      smem_potential[9][0][9] =
+          gridPotential[modIndex(idx + blockSize, idy - 1, idz + blockSize)].x;
+      smem_potential[9][9][0] =
+          gridPotential[modIndex(idx + blockSize, idy + blockSize, idz - 1)].x;
+      smem_potential[9][9][9] =
+          gridPotential[modIndex(idx + blockSize, idy + blockSize, idz + blockSize)].x;
+    }
 
-    gridField[idx] = getFieldInCell(x, y, z, gridPotential);
+    __syncthreads();
+
+    gridField[GRID_IDX(idx, idy, idz)].x =
+        -0.5f * (smem_potential[x + 1][y][z] - smem_potential[x - 1][y][z]);
+    gridField[GRID_IDX(idx, idy, idz)].y =
+        -0.5f * (smem_potential[x][y + 1][z] - smem_potential[x][y - 1][z]);
+    gridField[GRID_IDX(idx, idy, idz)].z =
+        -0.5f * (smem_potential[x][y][z + 1] - smem_potential[x][y][z - 1]);
   }
 }
 
@@ -165,6 +239,25 @@ __global__ void updateVelocities(Vec3* velocities, Vec3* accelerations) {
   }
 }
 
+float reassignDensityMs = 0;
+float forwardFFTMs = 0;
+float findFourierPotentialMs = 0;
+float inverseFFTMs = 0;
+float scaleAfterInverseMs = 0;
+float findFieldInCellsMs = 0;
+float updateAccelerationsMs = 0;
+
+cudaEvent_t reassignDensityStart, reassignDensityStop;
+cudaEvent_t forwardFFTStart, forwardFFTStop;
+cudaEvent_t findFourierPotentialStart, findFourierPotentialStop;
+cudaEvent_t inverseFFTStart, inverseFFTStop;
+cudaEvent_t scaleAfterInverseStart, scaleAfterInverseStop;
+cudaEvent_t findFieldInCellsStart, findFieldInCellsStop;
+cudaEvent_t updateAccelerationsStart, updateAccelerationsStop;
+
+dim3 block;
+dim3 grid;
+
 void pmMethodStep(Vec3* d_accelerations,
                   cufftComplex* d_gridDensity,
                   cufftComplex* d_gridDensityFourier,
@@ -177,31 +270,68 @@ void pmMethodStep(Vec3* d_accelerations,
                   float DT,
                   float G) {
   cudaMemset(d_gridDensity, 0, CELLS_CNT * sizeof(cufftComplex));
-  reassignDensity<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(d_gridDensity, d_positions, d_masses, H,
-                                                         DT, G);
-  cudaDeviceSynchronize();
+  cudaEventRecord(reassignDensityStart);
+  reassignDensity<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_gridDensity, d_positions, d_masses, H, DT, G);
+  cudaEventRecord(reassignDensityStop);
 
   cufftHandle plan = 0;
   cufftPlan3d(&plan, NG, NG, NG, CUFFT_C2C);
+  cudaEventRecord(forwardFFTStart);
   cufftExecC2C(plan, d_gridDensity, d_gridDensityFourier, CUFFT_FORWARD);
+  cudaEventRecord(forwardFFTStop);
 
   cudaMemset(d_gridPotentialFourier, 0, sizeof(cufftComplex) * CELLS_CNT);
+  cudaEventRecord(findFourierPotentialStart);
   findFourierPotential<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(d_gridPotentialFourier,
                                                               d_gridDensityFourier);
-  cudaDeviceSynchronize();
+  cudaEventRecord(findFourierPotentialStop);
 
   plan = 0;
   cufftPlan3d(&plan, NG, NG, NG, CUFFT_C2C);
+  cudaEventRecord(inverseFFTStart);
   cufftExecC2C(plan, d_gridPotentialFourier, d_gridPotential, CUFFT_INVERSE);
+  cudaEventRecord(inverseFFTStop);
   scaleAfterInverse<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(d_gridPotential);
-  cudaDeviceSynchronize();
 
-  findFieldInCells<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(d_gridField, d_gridPotential);
-  cudaDeviceSynchronize();
+  cudaEventRecord(findFieldInCellsStart);
+  findFieldInCells<<<grid, block>>>(d_gridField, d_gridPotential);
+  cudaEventRecord(findFieldInCellsStop);
 
+  cudaEventRecord(updateAccelerationsStart);
   updateAccelerations<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_accelerations, d_positions, d_gridField, H,
                                                      DT);
-  cudaDeviceSynchronize();
+  cudaEventRecord(updateAccelerationsStop);
+
+  cudaEventSynchronize(reassignDensityStop);
+  cudaEventSynchronize(forwardFFTStop);
+  cudaEventSynchronize(findFourierPotentialStop);
+  cudaEventSynchronize(inverseFFTStop);
+  cudaEventSynchronize(findFieldInCellsStop);
+  cudaEventSynchronize(updateAccelerationsStop);
+
+  float milliseconds = 0;
+  cudaEventElapsedTime(&milliseconds, reassignDensityStart, reassignDensityStop);
+  reassignDensityMs += milliseconds;
+
+  milliseconds = 0;
+  cudaEventElapsedTime(&milliseconds, forwardFFTStart, forwardFFTStop);
+  forwardFFTMs += milliseconds;
+
+  milliseconds = 0;
+  cudaEventElapsedTime(&milliseconds, findFourierPotentialStart, findFourierPotentialStop);
+  findFourierPotentialMs += milliseconds;
+
+  milliseconds = 0;
+  cudaEventElapsedTime(&milliseconds, inverseFFTStart, inverseFFTStop);
+  inverseFFTMs += milliseconds;
+
+  milliseconds = 0;
+  cudaEventElapsedTime(&milliseconds, findFieldInCellsStart, findFieldInCellsStop);
+  findFieldInCellsMs += milliseconds;
+
+  milliseconds = 0;
+  cudaEventElapsedTime(&milliseconds, updateAccelerationsStart, updateAccelerationsStop);
+  updateAccelerationsMs += milliseconds;
 }
 
 __global__ void setHalfVelocities(Vec3* velocities, Vec3* accelerations) {
@@ -223,6 +353,36 @@ void pmMethod(std::vector<Vec3>& state,
               float DT,
               float G,
               int simLength) {
+  block.x = 8;
+  block.y = 8;
+  block.z = 8;
+  grid.x = (64 + block.x - 1) / block.x;
+  grid.y = (64 + block.y - 1) / block.y;
+  grid.z = (64 + block.z - 1) / block.z;
+
+  cudaEventCreate(&reassignDensityStart);
+  cudaEventCreate(&reassignDensityStop);
+
+  cudaEventCreate(&forwardFFTStart);
+  cudaEventCreate(&forwardFFTStop);
+
+  cudaEventCreate(&findFourierPotentialStart);
+  cudaEventCreate(&findFourierPotentialStop);
+
+  cudaEventCreate(&inverseFFTStart);
+  cudaEventCreate(&inverseFFTStop);
+
+  cudaEventCreate(&scaleAfterInverseStart);
+  cudaEventCreate(&scaleAfterInverseStop);
+
+  cudaEventCreate(&findFieldInCellsStart);
+  cudaEventCreate(&findFieldInCellsStop);
+
+  cudaEventCreate(&updateAccelerationsStart);
+  cudaEventCreate(&updateAccelerationsStop);
+
+  StateRecorder stateRecorder("output_gpu.txt", "a", "b");
+
   float* d_masses;
   Vec3* d_positions;
   Vec3* d_velocities;
@@ -250,23 +410,20 @@ void pmMethod(std::vector<Vec3>& state,
   cudaMemcpy(d_masses, masses.data(), N * sizeof(float), cudaMemcpyHostToDevice);
 
   stateToCodeUnits<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities, H, DT, N);
-  cudaDeviceSynchronize();
 
   pmMethodStep(d_accelerations, d_gridDensity, d_gridDensityFourier, d_gridPotential,
                d_gridPotentialFourier, d_gridField, d_positions, d_masses, H, DT, G);
 
   setHalfVelocities<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_velocities, d_accelerations);
-  cudaDeviceSynchronize();
-  StateRecorder stateRecorder("output_gpu.txt", "a", "b");
+
   for (int t = 0; t <= simLength; ++t) {
+    cudaDeviceSynchronize();
     std::cout << "progress: " << float(t) / simLength << '\r';
     std::cout.flush();
 
     updatePositions<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities);
-    cudaDeviceSynchronize();
 
     stateToOrigUnits<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities, H, DT, N);
-    cudaDeviceSynchronize();
 
     // record positions
     cudaMemcpy(state.data(), d_positions, N * sizeof(Vec3), cudaMemcpyDeviceToHost);
@@ -279,15 +436,20 @@ void pmMethod(std::vector<Vec3>& state,
     }
 
     stateToCodeUnits<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities, H, DT, N);
-    cudaDeviceSynchronize();
 
     pmMethodStep(d_accelerations, d_gridDensity, d_gridDensityFourier, d_gridPotential,
                  d_gridPotentialFourier, d_gridField, d_positions, d_masses, H, DT, G);
 
     updateVelocities<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_velocities, d_accelerations);
-    cudaDeviceSynchronize();
   }
+  cudaDeviceSynchronize();
   stateRecorder.flush();
+  std::cout << "reassign density: " << reassignDensityMs << '\n';
+  std::cout << "forward FFT: " << forwardFFTMs << '\n';
+  std::cout << "find fourier potential: " << findFourierPotentialMs << '\n';
+  std::cout << "inverse FFT: " << inverseFFTMs << '\n';
+  std::cout << "find field in cells: " << findFieldInCellsMs << '\n';
+  std::cout << "update accelerations: " << updateAccelerationsMs << '\n';
 
   cudaFree(d_masses);
   cudaFree(d_positions);
@@ -299,4 +461,25 @@ void pmMethod(std::vector<Vec3>& state,
   cudaFree(d_gridPotential);
   cudaFree(d_gridPotentialFourier);
   cudaFree(d_gridField);
+
+  cudaEventDestroy(reassignDensityStart);
+  cudaEventDestroy(reassignDensityStop);
+
+  cudaEventDestroy(forwardFFTStart);
+  cudaEventDestroy(forwardFFTStop);
+
+  cudaEventDestroy(findFourierPotentialStart);
+  cudaEventDestroy(findFourierPotentialStop);
+
+  cudaEventDestroy(inverseFFTStart);
+  cudaEventDestroy(inverseFFTStop);
+
+  cudaEventDestroy(scaleAfterInverseStart);
+  cudaEventDestroy(scaleAfterInverseStop);
+
+  cudaEventDestroy(findFieldInCellsStart);
+  cudaEventDestroy(findFieldInCellsStop);
+
+  cudaEventDestroy(updateAccelerationsStart);
+  cudaEventDestroy(updateAccelerationsStop);
 }
