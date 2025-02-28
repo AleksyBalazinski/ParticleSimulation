@@ -118,15 +118,15 @@ __global__ void scaleAfterInverse(cufftComplex* gridPotential) {
   }
 }
 
-const int blockSizeX = 8;
+const int blockSizeX = 16;
 const int blockSizeY = 8;
-const int blockSizeZ = 16;
+const int blockSizeZ = 8;
 
 __global__ void findFieldInCells(Vec3* gridField, cufftComplex* gridPotential) {
 #ifdef USE_SMEM
-  const int blockSizeX = 8;
+  const int blockSizeX = 16;
   const int blockSizeY = 8;
-  const int blockSizeZ = 16;
+  const int blockSizeZ = 8;
 
   __shared__ float smem_potential[blockSizeX + 2][blockSizeY + 2][blockSizeZ + 2];
   int x = threadIdx.x + 1;
@@ -142,7 +142,7 @@ __global__ void findFieldInCells(Vec3* gridField, cufftComplex* gridPotential) {
     smem_potential[x][y][z] = gridPotential[GRID_IDX(idx, idy, idz)].x;
     if (threadIdx.x == 0) {
       smem_potential[0][y][z] = gridPotential[modIndex(idx - 1, idy, idz)].x;
-      smem_potential[blockSizeX + 1][y][z] = gridPotential[modIndex(idx + blockSizeY, idy, idz)].x;
+      smem_potential[blockSizeX + 1][y][z] = gridPotential[modIndex(idx + blockSizeX, idy, idz)].x;
     }
     if (threadIdx.y == 0) {
       smem_potential[x][0][z] = gridPotential[modIndex(idx, idy - 1, idz)].x;
