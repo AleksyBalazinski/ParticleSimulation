@@ -1,10 +1,12 @@
 #include <cufft.h>
 #include <algorithm>
+#include <chrono>
 #include <execution>
 #include <iostream>
 #include "common.h"
 #include "conversions.cuh"
 #include "disk_sampler_linear.cuh"
+#include "helper_macros.h"
 #include "state_recorder.cuh"
 #include "utils.cuh"
 
@@ -13,17 +15,6 @@
 #define GRID_IDX(x, y, z) ((x) + (y) * (NG) + (z) * (NG) * (NG))
 #define GROUP_SIZE 2
 #define USE_SMEM
-
-#define cudaCheckErrors(msg)                                                                       \
-  do {                                                                                             \
-    cudaError_t __err = cudaGetLastError();                                                        \
-    if (__err != cudaSuccess) {                                                                    \
-      fprintf(stderr, "Fatal error: %s (%s at %s:%d)\n", msg, cudaGetErrorString(__err), __FILE__, \
-              __LINE__);                                                                           \
-      fprintf(stderr, "*** FAILED - ABORTING\n");                                                  \
-      exit(1);                                                                                     \
-    }                                                                                              \
-  } while (0)
 
 __device__ int mod(int a, int b) {
   return (a % b + b) % b;
@@ -298,39 +289,28 @@ void pmMethodStep(Vec3* d_accelerations,
                   float DT,
                   float G) {
   cudaMemset(d_gridDensity, 0, CELLS_CNT * sizeof(cufftComplex));
-  cudaEventRecord(reassignDensityStart);
-  reassignDensity<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_gridDensity, d_positions, d_masses, H, DT, G);
-  cudaEventRecord(reassignDensityStop);
+  cudaTime(reassignDensity, reassignDensity<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(
+                                d_gridDensity, d_positions, d_masses, H, DT, G));
 
   cufftHandle plan = 0;
   cufftPlan3d(&plan, NG, NG, NG, CUFFT_C2C);
-  cudaEventRecord(forwardFFTStart);
-  cufftExecC2C(plan, d_gridDensity, d_gridDensityFourier, CUFFT_FORWARD);
-  cudaEventRecord(forwardFFTStop);
+  cudaTime(forwardFFT, cufftExecC2C(plan, d_gridDensity, d_gridDensityFourier, CUFFT_FORWARD));
 
   cudaMemset(d_gridPotentialFourier, 0, sizeof(cufftComplex) * CELLS_CNT);
-  cudaEventRecord(findFourierPotentialStart);
-  findFourierPotential<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(d_gridPotentialFourier,
-                                                              d_gridDensityFourier);
-  cudaEventRecord(findFourierPotentialStop);
+  cudaTime(findFourierPotential, findFourierPotential<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(
+                                     d_gridPotentialFourier, d_gridDensityFourier));
 
   plan = 0;
   cufftPlan3d(&plan, NG, NG, NG, CUFFT_C2C);
-  cudaEventRecord(inverseFFTStart);
-  cufftExecC2C(plan, d_gridPotentialFourier, d_gridPotential, CUFFT_INVERSE);
-  cudaEventRecord(inverseFFTStop);
+  cudaTime(inverseFFT, cufftExecC2C(plan, d_gridPotentialFourier, d_gridPotential, CUFFT_INVERSE));
   scaleAfterInverse<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(d_gridPotential);
 
-  cudaEventRecord(findFieldInCellsStart);
-  findFieldInCells<<<grid, block>>>(d_gridField, d_gridPotential);
+  cudaTime(findFieldInCells, findFieldInCells<<<grid, block>>>(d_gridField, d_gridPotential));
   // findFieldInCells2<<<dim3(NUM_BLOCKS(CELLS_CNT)), dim3(BLOCK_SIZE)>>>(d_gridField,
   //                                                                      d_gridPotential);
-  cudaEventRecord(findFieldInCellsStop);
 
-  cudaEventRecord(updateAccelerationsStart);
-  updateAccelerations<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_accelerations, d_positions, d_gridField, H,
-                                                     DT);
-  cudaEventRecord(updateAccelerationsStop);
+  cudaTime(updateAccelerations, updateAccelerations<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(
+                                    d_accelerations, d_positions, d_gridField, H, DT));
 
   cudaEventSynchronize(reassignDensityStop);
   cudaEventSynchronize(forwardFFTStop);
@@ -340,28 +320,12 @@ void pmMethodStep(Vec3* d_accelerations,
   cudaEventSynchronize(updateAccelerationsStop);
 
   float milliseconds = 0;
-  cudaEventElapsedTime(&milliseconds, reassignDensityStart, reassignDensityStop);
-  reassignDensityMs += milliseconds;
-
-  milliseconds = 0;
-  cudaEventElapsedTime(&milliseconds, forwardFFTStart, forwardFFTStop);
-  forwardFFTMs += milliseconds;
-
-  milliseconds = 0;
-  cudaEventElapsedTime(&milliseconds, findFourierPotentialStart, findFourierPotentialStop);
-  findFourierPotentialMs += milliseconds;
-
-  milliseconds = 0;
-  cudaEventElapsedTime(&milliseconds, inverseFFTStart, inverseFFTStop);
-  inverseFFTMs += milliseconds;
-
-  milliseconds = 0;
-  cudaEventElapsedTime(&milliseconds, findFieldInCellsStart, findFieldInCellsStop);
-  findFieldInCellsMs += milliseconds;
-
-  milliseconds = 0;
-  cudaEventElapsedTime(&milliseconds, updateAccelerationsStart, updateAccelerationsStop);
-  updateAccelerationsMs += milliseconds;
+  cudaAccTime(milliseconds, reassignDensity);
+  cudaAccTime(milliseconds, forwardFFT);
+  cudaAccTime(milliseconds, findFourierPotential);
+  cudaAccTime(milliseconds, inverseFFT);
+  cudaAccTime(milliseconds, findFieldInCells);
+  cudaAccTime(milliseconds, updateAccelerations);
 }
 
 __global__ void setHalfVelocities(Vec3* velocities, Vec3* accelerations) {
@@ -374,6 +338,15 @@ __global__ void updatePositions(Vec3* positions, Vec3* velocities) {
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < N; idx += blockDim.x * gridDim.x) {
     positions[idx] += velocities[idx];
   }
+}
+
+long long pmTimeMs = 0;
+long long memcpyTimeMs = 0;
+long long boundsCheckTimeMs = 0;
+long long recordStateTimeMs = 0;
+
+long long toMs(const std::chrono::nanoseconds delta) {
+  return std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
 }
 
 void pmMethod(std::vector<Vec3>& state,
@@ -455,21 +428,26 @@ void pmMethod(std::vector<Vec3>& state,
 
     stateToOrigUnits<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities, H, DT, N);
 
-    // record positions
-    cudaMemcpy(state.data(), d_positions, N * sizeof(Vec3), cudaMemcpyDeviceToHost);
-    stateRecorder.recordPositions(state.begin(), state.begin() + N);
+    hostTime(memcpy,
+             cudaMemcpy(state.data(), d_positions, N * sizeof(Vec3), cudaMemcpyDeviceToHost));
+
+    hostTime(recordState, stateRecorder.recordPositions(state.begin(), state.begin() + N));
+
+    auto boundsBegin = std::chrono::steady_clock::now();
     if (std::any_of(
             std::execution::par_unseq, state.begin(), state.begin() + N,
             [effectiveBoxSize](const Vec3& pos) { return !isWithinBox(pos, effectiveBoxSize); })) {
       std::cout << "Particle moved outside the grid.\n";
       break;
     }
+    auto boundsEnd = std::chrono::steady_clock::now();
+    boundsCheckTimeMs += toMs(boundsEnd - boundsBegin);
 
     stateToCodeUnits<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities, H, DT, N);
 
-    pmMethodStep(d_accelerations, d_gridDensity, d_gridDensityFourier, d_gridPotential,
-                 d_gridPotentialFourier, d_gridField, d_positions, d_masses, H, DT, G);
-
+    hostTime(pm,
+             pmMethodStep(d_accelerations, d_gridDensity, d_gridDensityFourier, d_gridPotential,
+                          d_gridPotentialFourier, d_gridField, d_positions, d_masses, H, DT, G));
     updateVelocities<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_velocities, d_accelerations);
   }
   cudaDeviceSynchronize();
@@ -480,6 +458,10 @@ void pmMethod(std::vector<Vec3>& state,
   std::cout << "inverse FFT: " << inverseFFTMs << '\n';
   std::cout << "find field in cells: " << findFieldInCellsMs << '\n';
   std::cout << "update accelerations: " << updateAccelerationsMs << '\n';
+  std::cout << "total PM: " << pmTimeMs << '\n';
+  std::cout << "memcpy: " << memcpyTimeMs << '\n';
+  std::cout << "bounds check: " << boundsCheckTimeMs << '\n';
+  std::cout << "record: " << recordStateTimeMs << '\n';
 
   cudaFree(d_masses);
   cudaFree(d_positions);

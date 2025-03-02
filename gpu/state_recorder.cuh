@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fstream>
+#include <memory>
 #include <string>
 #include <vector>
 #include "vec3.cuh"
@@ -24,6 +25,12 @@ class StateRecorder {
   int positionsRecordsCnt = 0;
 
   int maxRecords;
+
+  int vecBufSize = 150;
+  std::unique_ptr<char[]> vecBuf;
+
+  int singleBufSize = 50;
+  std::unique_ptr<char[]> singleBuf;
 
   void saveIfLimitHit(std::ofstream& of, std::string& str, int& counter);
 
