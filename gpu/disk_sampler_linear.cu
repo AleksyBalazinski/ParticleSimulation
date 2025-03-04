@@ -1,6 +1,5 @@
-#include "diskSamplerLinear.h"
-#include <numbers>
-#include "utils.h"
+#include "disk_sampler_linear.cuh"
+#include "utils.cuh"
 
 Vec3 DiskSamplerLinear::getVelocity(Vec3 pos,
                                     Vec3 center,
@@ -17,13 +16,13 @@ Vec3 DiskSamplerLinear::getVelocity(Vec3 pos,
   float rho = rVecxy.getMagnitude();
 
   float ra = r / rd;
-  float sigma0 = 3 * md / (std::numbers::pi_v<float> * rd * rd);
-  float k = 2.5f;
-  float h = 0.66f;
+  float sigma0 = 3 * md / (PI * rd * rd);
+  float k = 2.5;
+  float h = 0.66;
   float a = -k / (h * h);
   float gdVal = -G * sigma0 * (a * (ra - h) * (ra - h) + k);
 
-  Vec3 gb = externalFieldBulge(pos, center, rb, mb, G);
+  Vec3 gb = externalFieldBulgeHost(pos, center, rb, mb, G);
   Vec3 gd = gdVal * rVecxy / rVecxy.getMagnitude();
   Vec3 g = gb + gd;
   float gVal = g.getMagnitude();
@@ -38,7 +37,7 @@ float DiskSamplerLinear::sampleFromLinear(float rd) {
   float cdf = u(re);
   auto f = [rd, cdf, this](float r) { return implicitInvCDFLinear(r, rd, cdf); };
   auto df = [rd, this](float r) { return implicitInvCDFLinearDer(r, rd); };
-  return newton(f, df, rd / 2.0f, 100, 0.01f);
+  return newton(f, df, rd / 2.0, 100, 0.01);
 }
 
 DiskSamplerLinear::DiskSamplerLinear() : re(std::random_device{}()) {}
@@ -55,7 +54,7 @@ std::vector<Vec3> DiskSamplerLinear::sample(Vec3 center,
   std::vector<Vec3> state(2 * n);
 
   for (int i = 0; i < n; ++i) {
-    float phi = u(re) * 2 * std::numbers::pi_v<float>;
+    float phi = u(re) * 2 * PI;
     float r = sampleFromLinear(rd);
 
     float x = r * std::cos(phi);

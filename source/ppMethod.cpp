@@ -6,7 +6,7 @@
 
 // #define LEAPFROG
 
-Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<double>& masses, double G) {
+Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<float>& masses, float G) {
   const int n = (int)masses.size();
   Vec3 acc;
   for (int j = 0; j < n; j++) {
@@ -14,7 +14,7 @@ Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<double>& 
       continue;
 
     auto rij = r[i] - r[j];
-    acc += -1.0 * G * masses[j] / std::pow((rij.getMagnitude()), 3) * rij;
+    acc += -1.0f * G * masses[j] / std::powf((rij.getMagnitude()), 3) * rij;
   }
 
   return acc;
@@ -22,7 +22,7 @@ Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<double>& 
 
 typedef std::vector<Vec3> StateType;
 
-void nBody(StateType& x, StateType& dxdt, double t, const std::vector<double>& masses, double G) {
+void nBody(StateType& x, StateType& dxdt, float t, const std::vector<float>& masses, float G) {
   const int n = (int)masses.size();
   for (int i = 0; i < n; i++) {
     dxdt[i] = x[n + i];
@@ -31,21 +31,21 @@ void nBody(StateType& x, StateType& dxdt, double t, const std::vector<double>& m
 }
 
 void setIntegerVelocities(const std::vector<Vec3>& state,
-                          const std::vector<double>& masses,
-                          double G,
-                          double h,
+                          const std::vector<float>& masses,
+                          float G,
+                          float h,
                           std::vector<Vec3>& intVs) {
   int n = (int)intVs.size();
   for (int i = 0; i < n; i++) {
-    intVs[i] = state[n + i] + 0.5 * h * acceleration(i, state, masses, G);
+    intVs[i] = state[n + i] + 0.5f * h * acceleration(i, state, masses, G);
   }
 }
 
 std::string ppMethod(std::vector<Vec3>& state,
-                     std::vector<double>& masses,
+                     std::vector<float>& masses,
                      const int simLength,
-                     const double stepSize,
-                     const double G,
+                     const float stepSize,
+                     const float G,
                      const char* positionsPath,
                      const char* energyPath,
                      const char* momentumPath) {
@@ -59,13 +59,13 @@ std::string ppMethod(std::vector<Vec3>& state,
   }
   std::vector<Vec3> velocities(n);  // velocities at integer step (needed only for display)
 #else
-  auto system = [&masses, G](StateType& x, StateType& dxdt, double t) {
+  auto system = [&masses, G](StateType& x, StateType& dxdt, float t) {
     nBody(x, dxdt, t, masses, G);
   };
 
   RK4Stepper<Vec3> stepper(system, 2 * n);
 #endif
-  for (double t = 0; t <= simLength; ++t) {
+  for (float t = 0; t <= simLength; ++t) {
 #ifdef LEAPFROG
     for (int i = 0; i < n; i++) {
       state[i] += stepSize * state[n + i];

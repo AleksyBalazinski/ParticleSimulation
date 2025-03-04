@@ -1,7 +1,7 @@
 #pragma once
 
 #include <random>
-#include "vec3.h"
+#include "vec3.cuh"
 
 class DiskSamplerLinear {
  private:
@@ -12,7 +12,7 @@ class DiskSamplerLinear {
   float sampleFromLinear(float rd);
 
   inline float implicitInvCDFLinear(float r, float rd, float cdf) {
-    return 2 * std::powf(r, 3) - 3 * rd * r * r + cdf * std::powf(rd, 3);
+    return 2 * std::pow(r, 3) - 3 * rd * r * r + cdf * std::pow(rd, 3);
   }
 
   inline float implicitInvCDFLinearDer(float r, float rd) { return 6 * r * r - 6 * rd * r; }

@@ -4,19 +4,19 @@
 
 class Vec3 {
  public:
-  double x;
-  double y;
-  double z;
+  float x;
+  float y;
+  float z;
 
-  Vec3(double x, double y, double z);
+  Vec3(float x, float y, float z);
 
   Vec3();
 
   Vec3& operator+=(const Vec3 other);
 
-  double getMagnitude() const;
+  float getMagnitude() const;
 
-  double getMagnitudeSquared() const;
+  float getMagnitudeSquared() const;
 
   std::string toString() const;
 };
@@ -25,6 +25,6 @@ Vec3 operator+(const Vec3& a, const Vec3& b);
 
 Vec3 operator-(const Vec3& a, const Vec3& b);
 
-Vec3 operator*(double s, const Vec3& a);
+Vec3 operator*(float s, const Vec3& a);
 
-Vec3 operator/(const Vec3& a, double s);
+Vec3 operator/(const Vec3& a, float s);

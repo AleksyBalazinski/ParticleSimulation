@@ -1,5 +1,5 @@
-#include "stateRecorder.h"
 #include <filesystem>
+#include "state_recorder.cuh"
 
 void StateRecorder::saveIfLimitHit(std::ofstream& of, std::string& str, int& counter) {
   if (counter < maxRecords)
@@ -20,7 +20,11 @@ StateRecorder::StateRecorder(const char* positionsPath,
       maxRecords(maxRecords),
       positionsFile(positionsPath, std::ofstream::trunc),
       energyFile(energyPath, std::ofstream::trunc),
-      momentumFile(momentumPath, std::ofstream::trunc) {}
+      momentumFile(momentumPath, std::ofstream::trunc),
+      vecBuf(new char[vecBufSize]),
+      singleBuf(new char[singleBufSize]) {
+  positionsStr.reserve(30 * maxRecords);
+}
 
 StateRecorder::~StateRecorder() {
   positionsFile.close();
@@ -31,11 +35,12 @@ StateRecorder::~StateRecorder() {
 void StateRecorder::recordPositions(std::vector<Vec3>::iterator begin,
                                     std::vector<Vec3>::iterator end) {
   for (auto it = begin; it != end; ++it) {
-    positionsStr += it->toString() + '\n';
+    positionsStr += it->toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
+    positionsStr += '\n';
+    ++positionsRecordsCnt;
+    saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
   }
   positionsStr += "\n\n";
-  ++positionsRecordsCnt;
-  saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
 }
 
 void StateRecorder::recordEnergy(float pe, float ke) {
@@ -46,7 +51,7 @@ void StateRecorder::recordEnergy(float pe, float ke) {
 }
 
 void StateRecorder::recordTotalMomentum(Vec3 momentum) {
-  momentumStr += momentum.toString();
+  momentumStr += momentum.toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
   momentumStr += '\n';
   ++momentumRecordsCnt;
   saveIfLimitHit(momentumFile, momentumStr, momentumRecordsCnt);

@@ -6,19 +6,19 @@ std::vector<Vec3> randomInitialState(int particlesCnt,
                                      std::pair<Vec3, Vec3> initialVelocityRange) {
   std::default_random_engine re;
 
-  std::uniform_real_distribution<double> posDistX(initalPositionRange.first.x,
-                                                  initalPositionRange.second.x);
-  std::uniform_real_distribution<double> posDistY(initalPositionRange.first.y,
-                                                  initalPositionRange.second.y);
-  std::uniform_real_distribution<double> posDistZ(initalPositionRange.first.z,
-                                                  initalPositionRange.second.z);
+  std::uniform_real_distribution<float> posDistX(initalPositionRange.first.x,
+                                                 initalPositionRange.second.x);
+  std::uniform_real_distribution<float> posDistY(initalPositionRange.first.y,
+                                                 initalPositionRange.second.y);
+  std::uniform_real_distribution<float> posDistZ(initalPositionRange.first.z,
+                                                 initalPositionRange.second.z);
 
-  std::uniform_real_distribution<double> velocityDistX(initialVelocityRange.first.x,
-                                                       initialVelocityRange.second.x);
-  std::uniform_real_distribution<double> velocityDistY(initialVelocityRange.first.y,
-                                                       initialVelocityRange.second.y);
-  std::uniform_real_distribution<double> velocityDistZ(initialVelocityRange.first.z,
-                                                       initialVelocityRange.second.z);
+  std::uniform_real_distribution<float> velocityDistX(initialVelocityRange.first.x,
+                                                      initialVelocityRange.second.x);
+  std::uniform_real_distribution<float> velocityDistY(initialVelocityRange.first.y,
+                                                      initialVelocityRange.second.y);
+  std::uniform_real_distribution<float> velocityDistZ(initialVelocityRange.first.z,
+                                                      initialVelocityRange.second.z);
 
   std::vector<Vec3> initialState(2 * particlesCnt);
 
@@ -35,11 +35,11 @@ std::vector<Vec3> randomInitialState(int particlesCnt,
   return initialState;
 }
 
-std::vector<double> randomMasses(int particlesCnt, std::pair<double, double> massRange) {
+std::vector<float> randomMasses(int particlesCnt, std::pair<float, float> massRange) {
   std::default_random_engine re;
-  std::uniform_real_distribution<double> massDist(massRange.first, massRange.second);
+  std::uniform_real_distribution<float> massDist(massRange.first, massRange.second);
 
-  std::vector<double> masses(particlesCnt);
+  std::vector<float> masses(particlesCnt);
 
   for (int i = 0; i < particlesCnt; i++) {
     masses[i] = massDist(re);
@@ -48,28 +48,28 @@ std::vector<double> randomMasses(int particlesCnt, std::pair<double, double> mas
   return masses;
 }
 
-Vec3 externalFieldBulge(Vec3 pos, Vec3 bulge, double rb, double mb, double G) {
-  double r = (pos - bulge).getMagnitude();
+Vec3 externalFieldBulge(Vec3 pos, Vec3 bulge, float rb, float mb, float G) {
+  float r = (pos - bulge).getMagnitude();
   Vec3 dir = (pos - bulge) / r;
-  double g;
+  float g;
   if (r > rb) {
     g = -G * mb / (r * r);
   } else {
-    g = -(G * mb / std::pow(rb, 3)) * r * (4 - 3 * r / rb);
+    g = -(G * mb / std::powf(rb, 3)) * r * (4 - 3 * r / rb);
   }
 
   return g * dir;
 }
 
-double newton(std::function<double(double)> f,
-              std::function<double(double)> df,
-              double guess,
-              int maxIter,
-              double tolerance) {
+float newton(std::function<float(float)> f,
+             std::function<float(float)> df,
+             float guess,
+             int maxIter,
+             float tolerance) {
   int i = 0;
-  double err = tolerance + 1;
-  double x = guess;
-  double xPrev;
+  float err = tolerance + 1;
+  float x = guess;
+  float xPrev;
   while (err > tolerance && i < maxIter) {
     ++i;
     xPrev = x;

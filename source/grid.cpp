@@ -18,7 +18,7 @@ Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
   std::memset(density.data(), 0, length * sizeof(std::complex<float>));
 }
 
-void Grid::assignDensity(int x, int y, int z, double d) {
+void Grid::assignDensity(int x, int y, int z, float d) {
   density[x * gridPoints * gridPoints + y * gridPoints + z] += d;
 }
 
@@ -52,6 +52,6 @@ std::complex<float> Grid::getDensityFourier(int i, int j, int k) const {
   return densityFourier[idx];
 }
 
-double Grid::getPotential(int i, int j, int k) const {
+float Grid::getPotential(int i, int j, int k) const {
   return potential[getIndx(i, j, k, gridPoints)].real();
 }

@@ -8,12 +8,12 @@ std::vector<Vec3> randomInitialState(int particlesCnt,
                                      std::pair<Vec3, Vec3> initalPositionRange,
                                      std::pair<Vec3, Vec3> initialVelocityRange);
 
-std::vector<double> randomMasses(int particlesCnt, std::pair<double, double> massRange);
+std::vector<float> randomMasses(int particlesCnt, std::pair<float, float> massRange);
 
-Vec3 externalFieldBulge(Vec3 pos, Vec3 bulge, double rb, double mb, double G);
+Vec3 externalFieldBulge(Vec3 pos, Vec3 bulge, float rb, float mb, float G);
 
-double newton(std::function<double(double)> f,
-              std::function<double(double)> df,
-              double guess,
-              int maxIter,
-              double tolerance);
+float newton(std::function<float(float)> f,
+             std::function<float(float)> df,
+             float guess,
+             int maxIter,
+             float tolerance);

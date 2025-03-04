@@ -35,7 +35,7 @@ TEST(kissFFTApapter, forwardAndBackward) {
   adapter.ifft(transformed, invTransformed);
 
   for (int i = 0; i < original.size(); ++i) {
-    ASSERT_NEAR(invTransformed[i].real(), original[i].real(), 1e-6);
-    ASSERT_NEAR(invTransformed[i].imag(), original[i].imag(), 1e-6);
+    ASSERT_NEAR(invTransformed[i].real(), original[i].real(), 1e-6f);
+    ASSERT_NEAR(invTransformed[i].imag(), original[i].imag(), 1e-6f);
   }
 }
