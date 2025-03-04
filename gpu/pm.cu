@@ -224,14 +224,34 @@ __device__ Vec3 interpolateField(Vec3* gridField, Vec3 position) {
   float ty = 1 - dy;
   float tz = 1 - dz;
 
-  return tx * ty * tz * gridField[GRID_IDX(xi, yi, zi)] +
-         dx * ty * tz * gridField[GRID_IDX(xi + 1, yi, zi)] +
-         tx * dy * tz * gridField[GRID_IDX(xi, yi + 1, zi)] +
-         tx * ty * dz * gridField[GRID_IDX(xi, yi, zi + 1)] +
-         dx * dy * tz * gridField[GRID_IDX(xi + 1, yi + 1, zi)] +
-         dx * ty * dz * gridField[GRID_IDX(xi + 1, yi, zi + 1)] +
-         tx * dy * dz * gridField[GRID_IDX(xi, yi + 1, zi + 1)] +
-         dx * dy * dz * gridField[GRID_IDX(xi + 1, yi + 1, zi + 1)];
+  float resX = tx * ty * tz * gridField[GRID_IDX(xi, yi, zi)].x +
+               dx * ty * tz * gridField[GRID_IDX(xi + 1, yi, zi)].x +
+               tx * dy * tz * gridField[GRID_IDX(xi, yi + 1, zi)].x +
+               tx * ty * dz * gridField[GRID_IDX(xi, yi, zi + 1)].x +
+               dx * dy * tz * gridField[GRID_IDX(xi + 1, yi + 1, zi)].x +
+               dx * ty * dz * gridField[GRID_IDX(xi + 1, yi, zi + 1)].x +
+               tx * dy * dz * gridField[GRID_IDX(xi, yi + 1, zi + 1)].x +
+               dx * dy * dz * gridField[GRID_IDX(xi + 1, yi + 1, zi + 1)].x;
+
+  float resY = tx * ty * tz * gridField[GRID_IDX(xi, yi, zi)].y +
+               dx * ty * tz * gridField[GRID_IDX(xi + 1, yi, zi)].y +
+               tx * dy * tz * gridField[GRID_IDX(xi, yi + 1, zi)].y +
+               tx * ty * dz * gridField[GRID_IDX(xi, yi, zi + 1)].y +
+               dx * dy * tz * gridField[GRID_IDX(xi + 1, yi + 1, zi)].y +
+               dx * ty * dz * gridField[GRID_IDX(xi + 1, yi, zi + 1)].y +
+               tx * dy * dz * gridField[GRID_IDX(xi, yi + 1, zi + 1)].y +
+               dx * dy * dz * gridField[GRID_IDX(xi + 1, yi + 1, zi + 1)].y;
+
+  float resZ = tx * ty * tz * gridField[GRID_IDX(xi, yi, zi)].z +
+               dx * ty * tz * gridField[GRID_IDX(xi + 1, yi, zi)].z +
+               tx * dy * tz * gridField[GRID_IDX(xi, yi + 1, zi)].z +
+               tx * ty * dz * gridField[GRID_IDX(xi, yi, zi + 1)].z +
+               dx * dy * tz * gridField[GRID_IDX(xi + 1, yi + 1, zi)].z +
+               dx * ty * dz * gridField[GRID_IDX(xi + 1, yi, zi + 1)].z +
+               tx * dy * dz * gridField[GRID_IDX(xi, yi + 1, zi + 1)].z +
+               dx * dy * dz * gridField[GRID_IDX(xi + 1, yi + 1, zi + 1)].z;
+
+  return Vec3(resX, resY, resZ);
 }
 
 __global__ void updateAccelerations(Vec3* accelerations,
@@ -248,13 +268,17 @@ __global__ void updateAccelerations(Vec3* accelerations,
     Vec3 extField = accelerationToCodeUnits(
         externalFieldBulge(positionToOrigUnits(positions[idx], H), galaxyCenter, rb, mb, G), H, DT);
 
-    accelerations[idx] = intField + extField;
+    accelerations[idx].x = intField.x + extField.x;
+    accelerations[idx].y = intField.y + extField.y;
+    accelerations[idx].z = intField.z + extField.z;
   }
 }
 
 __global__ void updateVelocities(Vec3* velocities, Vec3* accelerations) {
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < N; idx += blockDim.x * gridDim.x) {
-    velocities[idx] += accelerations[idx];
+    velocities[idx].x += accelerations[idx].x;
+    velocities[idx].y += accelerations[idx].y;
+    velocities[idx].z += accelerations[idx].z;
   }
 }
 

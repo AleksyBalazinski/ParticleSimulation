@@ -22,7 +22,7 @@ Vec3 DiskSamplerLinear::getVelocity(Vec3 pos,
   float a = -k / (h * h);
   float gdVal = -G * sigma0 * (a * (ra - h) * (ra - h) + k);
 
-  Vec3 gb = externalFieldBulge(pos, center, rb, mb, G);
+  Vec3 gb = externalFieldBulgeHost(pos, center, rb, mb, G);
   Vec3 gd = gdVal * rVecxy / rVecxy.getMagnitude();
   Vec3 g = gb + gd;
   float gVal = g.getMagnitude();
