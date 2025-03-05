@@ -13,14 +13,13 @@
 #define CELLS_CNT ((NG) * (NG) * (NG))
 #define NUM_BLOCKS(n) (((BLOCK_SIZE) + (n) - 1) / (BLOCK_SIZE))
 #define GRID_IDX(x, y, z) ((x) + (y) * (NG) + (z) * (NG) * (NG))
-#define GROUP_SIZE 2
 #define USE_SMEM
 
-__device__ int mod(int a, int b) {
+__device__ inline int mod(int a, int b) {
   return (a % b + b) % b;
 }
 
-__device__ int modIndex(int i, int j, int k) {
+__device__ inline int modIndex(int i, int j, int k) {
   return mod(i, NG) + mod(j, NG) * NG + mod(k, NG) * NG * NG;
 }
 
@@ -90,18 +89,6 @@ __global__ void findFourierPotential(cufftComplex* potentialFourier,
   }
 }
 
-__device__ Vec3 getFieldInCell(int x, int y, int z, cufftComplex* gridPotential) {
-  Vec3 field;
-  field.x =
-      -0.5f * (gridPotential[modIndex(x + 1, y, z)].x - gridPotential[modIndex(x - 1, y, z)].x);
-  field.y =
-      -0.5f * (gridPotential[modIndex(x, y + 1, z)].x - gridPotential[modIndex(x, y - 1, z)].x);
-  field.z =
-      -0.5f * (gridPotential[modIndex(x, y, z + 1)].x - gridPotential[modIndex(x, y, z - 1)].x);
-
-  return field;
-}
-
 __global__ void scaleAfterInverse(cufftComplex* gridPotential) {
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < CELLS_CNT;
        idx += gridDim.x * blockDim.x) {
@@ -120,96 +107,59 @@ __global__ void findFieldInCells(Vec3* gridField, cufftComplex* gridPotential) {
   const int blockSizeZ = 8;
 
   __shared__ float smem_potential[blockSizeX + 2][blockSizeY + 2][blockSizeZ + 2];
-  int x = threadIdx.x + 1;
-  int y = threadIdx.y + 1;
-  int z = threadIdx.z + 1;
 #endif
+
   int idx = threadIdx.x + blockDim.x * blockIdx.x;
   int idy = threadIdx.y + blockDim.y * blockIdx.y;
   int idz = threadIdx.z + blockDim.z * blockIdx.z;
 
   if ((idx < NG) && (idy < NG) && (idz < NG)) {
 #ifdef USE_SMEM
+    int x = threadIdx.x + 1;
+    int y = threadIdx.y + 1;
+    int z = threadIdx.z + 1;
+
     smem_potential[x][y][z] = gridPotential[GRID_IDX(idx, idy, idz)].x;
-    if (threadIdx.x == 0) {
-      smem_potential[0][y][z] = gridPotential[modIndex(idx - 1, idy, idz)].x;
-      smem_potential[blockSizeX + 1][y][z] = gridPotential[modIndex(idx + blockSizeX, idy, idz)].x;
-    }
-    if (threadIdx.y == 0) {
-      smem_potential[x][0][z] = gridPotential[modIndex(idx, idy - 1, idz)].x;
-      smem_potential[x][blockSizeY + 1][z] = gridPotential[modIndex(idx, idy + blockSizeY, idz)].x;
-    }
-    if (threadIdx.z == 0) {
-      smem_potential[x][y][0] = gridPotential[modIndex(idx, idy, idz - 1)].x;
-      smem_potential[x][y][blockSizeZ + 1] = gridPotential[modIndex(idx, idy, idz + blockSizeZ)].x;
-    }
-    if (threadIdx.x == 0 && threadIdx.y == 0) {
-      smem_potential[0][0][z] = gridPotential[modIndex(idx - 1, idy - 1, idz)].x;
-      smem_potential[0][blockSizeY + 1][z] =
-          gridPotential[modIndex(idx - 1, idy + blockSizeY, idz)].x;
-      smem_potential[blockSizeX + 1][0][z] =
-          gridPotential[modIndex(idx + blockSizeX, idy - 1, idz)].x;
-      smem_potential[blockSizeX + 1][blockSizeY + 1][z] =
-          gridPotential[modIndex(idx + blockSizeX, idy + blockSizeY, idz)].x;
-    }
-    if (threadIdx.x == 0 && threadIdx.z == 0) {
-      smem_potential[0][y][0] = gridPotential[modIndex(idx - 1, idy, idz - 1)].x;
-      smem_potential[0][y][blockSizeZ + 1] =
-          gridPotential[modIndex(idx - 1, idy, idz + blockSizeZ)].x;
-      smem_potential[blockSizeX + 1][y][0] =
-          gridPotential[modIndex(idx + blockSizeX, idy, idz - 1)].x;
-      smem_potential[blockSizeX + 1][y][blockSizeZ + 1] =
-          gridPotential[modIndex(idx + blockSizeX, idy, idz + blockSizeZ)].x;
-    }
-    if (threadIdx.y == 0 && threadIdx.z == 0) {
-      smem_potential[x][0][0] = gridPotential[modIndex(idx, idy - 1, idz - 1)].x;
-      smem_potential[x][0][blockSizeZ + 1] =
-          gridPotential[modIndex(idx, idy - 1, idz + blockSizeZ)].x;
-      smem_potential[x][blockSizeY + 1][0] =
-          gridPotential[modIndex(idx, idy + blockSizeY, idz - 1)].x;
-      smem_potential[x][blockSizeY + 1][blockSizeZ + 1] =
-          gridPotential[modIndex(idx, idy + blockSizeY, idz + blockSizeZ)].x;
-    }
-    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-      smem_potential[0][0][0] = gridPotential[modIndex(idx - 1, idy - 1, idz - 1)].x;
-      smem_potential[0][0][blockSizeZ + 1] =
-          gridPotential[modIndex(idx - 1, idy - 1, idz + blockSizeZ)].x;
-      smem_potential[0][blockSizeY + 1][0] =
-          gridPotential[modIndex(idx - 1, idy + blockSizeY, idz - 1)].x;
-      smem_potential[blockSizeX + 1][0][0] =
-          gridPotential[modIndex(idx + blockSizeX, idy - 1, idz - 1)].x;
-      smem_potential[0][blockSizeY + 1][blockSizeZ + 1] =
-          gridPotential[modIndex(idx - 1, idy + blockSizeY, idz + blockSizeZ)].x;
-      smem_potential[blockSizeX + 1][0][blockSizeZ + 1] =
-          gridPotential[modIndex(idx + blockSizeX, idy - 1, idz + blockSizeZ)].x;
-      smem_potential[blockSizeX + 1][blockSizeY + 1][0] =
-          gridPotential[modIndex(idx + blockSizeX, idy + blockSizeY, idz - 1)].x;
-      smem_potential[blockSizeX + 1][blockSizeY + 1][blockSizeZ + 1] =
-          gridPotential[modIndex(idx + blockSizeX, idy + blockSizeY, idz + blockSizeZ)].x;
-    }
 
     __syncthreads();
 
-    gridField[GRID_IDX(idx, idy, idz)].x =
-        -0.5f * (smem_potential[x + 1][y][z] - smem_potential[x - 1][y][z]);
-    gridField[GRID_IDX(idx, idy, idz)].y =
-        -0.5f * (smem_potential[x][y + 1][z] - smem_potential[x][y - 1][z]);
-    gridField[GRID_IDX(idx, idy, idz)].z =
-        -0.5f * (smem_potential[x][y][z + 1] - smem_potential[x][y][z - 1]);
+    float xl, yl, zl;
+    float xr, yr, zr;
+
+    xl = (x == 1) ? gridPotential[modIndex(idx - 1, idy, idz)].x : smem_potential[x - 1][y][z];
+    yl = (y == 1) ? gridPotential[modIndex(idx, idy - 1, idz)].x : smem_potential[x][y - 1][z];
+    zl = (z == 1) ? gridPotential[modIndex(idx, idy, idz - 1)].x : smem_potential[x][y][z - 1];
+    xr = (x == blockSizeX) ? gridPotential[modIndex(idx + 1, idy, idz)].x
+                           : smem_potential[x + 1][y][z];
+    yr = (y == blockSizeY) ? gridPotential[modIndex(idx, idy + 1, idz)].x
+                           : smem_potential[x][y + 1][z];
+    zr = (z == blockSizeZ) ? gridPotential[modIndex(idx, idy, idz + 1)].x
+                           : smem_potential[x][y][z + 1];
+
+    gridField[GRID_IDX(idx, idy, idz)].x = -0.5f * (xr - xl);
+    gridField[GRID_IDX(idx, idy, idz)].y = -0.5f * (yr - yl);
+    gridField[GRID_IDX(idx, idy, idz)].z = -0.5f * (zr - zl);
 #else
-    gridField[GRID_IDX(idx, idy, idz)] = getFieldInCell(idx, idy, idz, gridPotential);
+    float xl, yl, zl;
+    float xr, yr, zr;
+
+    xl = (idx == 0) ? gridPotential[modIndex(idx - 1, idy, idz)].x
+                    : gridPotential[GRID_IDX(idx - 1, idy, idz)].x;
+    yl = (idy == 0) ? gridPotential[modIndex(idx, idy - 1, idz)].x
+                    : gridPotential[GRID_IDX(idx, idy - 1, idz)].x;
+    zl = (idz == 0) ? gridPotential[modIndex(idx, idy, idz - 1)].x
+                    : gridPotential[GRID_IDX(idx, idy, idz - 1)].x;
+    xr = (idx == NG - 1) ? gridPotential[modIndex(idx + 1, idy, idz)].x
+                         : gridPotential[GRID_IDX(idx + 1, idy, idz)].x;
+    yr = (idy == NG - 1) ? gridPotential[modIndex(idx, idy + 1, idz)].x
+                         : gridPotential[GRID_IDX(idx, idy + 1, idz)].x;
+    zr = (idz == NG - 1) ? gridPotential[modIndex(idx, idy, idz + 1)].x
+                         : gridPotential[GRID_IDX(idx, idy, idz + 1)].x;
+
+    gridField[GRID_IDX(idx, idy, idz)].x = -0.5f * (xr - xl);
+    gridField[GRID_IDX(idx, idy, idz)].y = -0.5f * (yr - yl);
+    gridField[GRID_IDX(idx, idy, idz)].z = -0.5f * (zr - zl);
 #endif
-  }
-}
-
-__global__ void findFieldInCells2(Vec3* gridField, cufftComplex* gridPotential) {
-  for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < CELLS_CNT;
-       idx += gridDim.x * blockDim.x) {
-    int x = idx % NG;
-    int y = (idx / NG) % NG;
-    int z = idx / (NG * NG);
-
-    gridField[idx] = getFieldInCell(x, y, z, gridPotential);
   }
 }
 
@@ -330,8 +280,6 @@ void pmMethodStep(Vec3* d_accelerations,
   scaleAfterInverse<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(d_gridPotential);
 
   cudaTime(findFieldInCells, findFieldInCells<<<grid, block>>>(d_gridField, d_gridPotential));
-  // findFieldInCells2<<<dim3(NUM_BLOCKS(CELLS_CNT)), dim3(BLOCK_SIZE)>>>(d_gridField,
-  //                                                                      d_gridPotential);
 
   cudaTime(updateAccelerations, updateAccelerations<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(
                                     d_accelerations, d_positions, d_gridField, H, DT));
