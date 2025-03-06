@@ -13,7 +13,9 @@ class Grid {
 
   long mod(long a, long b) const { return (a % b + b) % b; }
 
-  long getIndx(int i, int j, int k, int dim) const;
+  long getWrappedIndx(int i, int j, int k, int dim) const;
+
+  long getIndx(int i, int j, int k) const;
 
   std::vector<std::complex<float>> density;
   std::vector<std::complex<float>> densityFourier;

@@ -2,8 +2,12 @@
 #include <algorithm>
 #include <complex>
 
-long Grid::getIndx(int i, int j, int k, int dim) const {
-  return mod(i, dim) * dim * dim + mod(j, dim) * dim + mod(k, dim);
+long Grid::getWrappedIndx(int i, int j, int k, int dim) const {
+  return mod(i, dim) + mod(j, dim) * dim + mod(k, dim) * dim * dim;
+}
+
+long Grid::getIndx(int i, int j, int k) const {
+  return i + j * gridPoints + k * gridPoints * gridPoints;
 }
 
 Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
@@ -19,7 +23,7 @@ Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
 }
 
 void Grid::assignDensity(int x, int y, int z, float d) {
-  density[x * gridPoints * gridPoints + y * gridPoints + z] += d;
+  density[getIndx(x, y, z)] += d;
 }
 
 void Grid::clearDensity() {
@@ -27,11 +31,11 @@ void Grid::clearDensity() {
 }
 
 void Grid::assignField(int x, int y, int z, Vec3 fieldVal) {
-  field[x * gridPoints * gridPoints + y * gridPoints + z] = fieldVal;
+  field[getIndx(x, y, z)] = fieldVal;
 }
 
 Vec3 Grid::getField(int x, int y, int z) {
-  return field[x * gridPoints * gridPoints + y * gridPoints + z];
+  return field[getIndx(x, y, z)];
 }
 
 const std::vector<std::complex<float>>& Grid::fftDensity() {
@@ -43,15 +47,13 @@ const std::vector<std::complex<float>>& Grid::invFftPotential() {
 }
 
 void Grid::setPotentialFourier(int i, int j, int k, std::complex<float> value) {
-  int idx = i * gridPoints * gridPoints + j * gridPoints + k;
-  potentialFourier[idx] = value;
+  potentialFourier[getIndx(i, j, k)] = value;
 }
 
 std::complex<float> Grid::getDensityFourier(int i, int j, int k) const {
-  int idx = i * gridPoints * gridPoints + j * gridPoints + k;
-  return densityFourier[idx];
+  return densityFourier[getIndx(i, j, k)];
 }
 
 float Grid::getPotential(int i, int j, int k) const {
-  return potential[getIndx(i, j, k, gridPoints)].real();
+  return potential[getWrappedIndx(i, j, k, gridPoints)].real();
 }

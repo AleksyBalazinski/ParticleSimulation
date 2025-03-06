@@ -76,9 +76,9 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
   auto gridIdxRange = std::ranges::views::iota(0, dim * dim * dim);
   std::for_each(std::execution::par_unseq, gridIdxRange.begin(), gridIdxRange.end(),
                 [dim, this](int idx) {
-                  int kx = idx / (dim * dim);
+                  int kx = idx % dim;
                   int ky = (idx / dim) % dim;
-                  int kz = idx % dim;
+                  int kz = idx / (dim * dim);
                   if (kx == 0 && ky == 0 && kz == 0) {
                     return;
                   }
@@ -106,9 +106,9 @@ void PMMethod::updateAccelerations(std::vector<Vec3>& accelerations, StateRecord
   // find field in a meshpoint
   std::for_each(std::execution::par_unseq, gridIdxRange.begin(), gridIdxRange.end(),
                 [dim, this](int idx) {
-                  int x = idx / (dim * dim);
+                  int x = idx % dim;
                   int y = (idx / dim) % dim;
-                  int z = idx % dim;
+                  int z = idx / (dim * dim);
                   auto [fieldX, fieldY, fieldZ] = getFieldInCell(x, y, z, fds, grid);
 
                   Vec3 fieldStrength(fieldX, fieldY, fieldZ);
