@@ -18,10 +18,10 @@ class Vec3 {
 
   __host__ __device__ float getMagnitudeSquared() const;
 
-  __host__ char* Vec3::toString(char* singleBuf,
-                                std::size_t singleBufSize,
-                                char* vecBuf,
-                                std::size_t vecBufSize) const;
+  __host__ char* toString(char* singleBuf,
+                          std::size_t singleBufSize,
+                          char* vecBuf,
+                          std::size_t vecBufSize) const;
 
   __host__ __device__ Vec3(const float3& from);
 

@@ -18,7 +18,10 @@ class Vec3 {
 
   float getMagnitudeSquared() const;
 
-  std::string toString() const;
+  char* toString(char* singleBuf,
+                 std::size_t singleBufSize,
+                 char* vecBuf,
+                 std::size_t vecBufSize) const;
 };
 
 Vec3 operator+(const Vec3& a, const Vec3& b);

@@ -25,6 +25,12 @@ class StateRecorder {
 
   int maxRecords;
 
+  int vecBufSize = 150;
+  std::unique_ptr<char[]> vecBuf;
+
+  int singleBufSize = 50;
+  std::unique_ptr<char[]> singleBuf;
+
   void saveIfLimitHit(std::ofstream& of, std::string& str, int& counter);
 
  public:

@@ -54,8 +54,8 @@ std::vector<Vec3> DiskSampler::sample(Vec3 center,
   std::vector<Vec3> state(2 * n);
 
   for (int i = 0; i < n; ++i) {
-    float phi = u(re) * 2 * std::numbers::pi;
-    float r = 0.97 * rd * std::sqrt(u(re));
+    float phi = u(re) * 2 * std::numbers::pi_v<float>;
+    float r = 0.97 * rd * std::sqrtf(u(re));
 
     float x = r * std::cos(phi);
     float y = r * std::sin(phi);

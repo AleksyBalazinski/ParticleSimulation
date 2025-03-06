@@ -1,5 +1,7 @@
 #include "vec3.h"
 #include <cmath>
+#include <cstdio>
+#include <cstring>
 
 Vec3 operator+(const Vec3& a, const Vec3& b) {
   return Vec3(a.x + b.x, a.y + b.y, a.z + b.z);
@@ -37,6 +39,21 @@ float Vec3::getMagnitudeSquared() const {
   return x * x + y * y + z * z;
 }
 
-std::string Vec3::toString() const {
-  return std::to_string(x) + ' ' + std::to_string(y) + ' ' + std::to_string(z);
+char* Vec3::toString(char* singleBuf,
+                     std::size_t singleBufSize,
+                     char* vecBuf,
+                     std::size_t vecBufSize) const {
+  std::memset(vecBuf, 0, vecBufSize);
+  int cnt1 = std::snprintf(singleBuf, singleBufSize, "%f", x);
+  std::memcpy(vecBuf, singleBuf, cnt1);
+  vecBuf[cnt1] = ' ';
+
+  int cnt2 = std::snprintf(singleBuf, singleBufSize, "%f", y);
+  std::memcpy(vecBuf + cnt1 + 1, singleBuf, cnt2);
+  vecBuf[cnt1 + 1 + cnt2] = ' ';
+
+  int cnt3 = std::snprintf(singleBuf, singleBufSize, "%f", z);
+  std::memcpy(vecBuf + cnt1 + cnt2 + 2, singleBuf, cnt3);
+
+  return vecBuf;
 }
