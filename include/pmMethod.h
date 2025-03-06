@@ -12,8 +12,12 @@ enum class FiniteDiffScheme { TWO_POINT, FOUR_POINT };
 class PMMethod {
  private:
   Grid& grid;
+  float effectiveBoxSize;
   std::vector<Vec3>& state;
   std::vector<float>& masses;
+  std::vector<Vec3> accelerations;
+  std::vector<Vec3> intStepVelocities;
+  int N;
   std::function<Vec3(Vec3)> externalField;
   float H;
   float DT;
@@ -22,13 +26,29 @@ class PMMethod {
   FiniteDiffScheme fds;
 
   void reassignDensity();
-  Vec3 getField(float x, float y, float z);
 
-  void updateAccelerations(std::vector<Vec3>& accelerations, StateRecorder& sr);
+  Vec3 interpolateField(float x, float y, float z);
+
+  void setHalfVelocities();
+
+  void updateVelocities();
+
+  void updatePositions();
+
+  void pmMethodStep();
+
+  void findFourierPotential();
+
+  void findFieldInCells();
+
+  void updateAccelerations();
+
+  bool escapedComputationalBox();
 
  public:
   PMMethod(std::vector<Vec3>& state,
            std::vector<float>& masses,
+           float effectiveBoxSize,
            std::function<Vec3(Vec3)> externalField,
            float H,
            float DT,

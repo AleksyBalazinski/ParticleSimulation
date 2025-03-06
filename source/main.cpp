@@ -38,7 +38,7 @@ int main() {
   float H = effectiveBoxSize / (gridPoints / 2);
   float DT = 1;
 
-  PMMethod pm(state, masses, externalField, H, DT, G, InterpolationScheme::CIC,
+  PMMethod pm(state, masses, effectiveBoxSize, externalField, H, DT, G, InterpolationScheme::CIC,
               FiniteDiffScheme::TWO_POINT, grid);
 
   pm.run(200);
