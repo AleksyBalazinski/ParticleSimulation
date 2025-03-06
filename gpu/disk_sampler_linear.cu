@@ -1,14 +1,13 @@
 #include "disk_sampler_linear.cuh"
+#include "external_fields.cuh"
 #include "utils.cuh"
 
 Vec3 DiskSamplerLinear::getVelocity(Vec3 pos,
-                                    Vec3 center,
-                                    float rb,
-                                    float mb,
+                                    SphRadDecrFieldParams bulgeParams,
                                     float rd,
                                     float md,
                                     float G) {
-  Vec3 rVec = pos - center;
+  Vec3 rVec = pos - bulgeParams.center;
   float r = rVec.getMagnitude();
 
   Vec3 rVecxy = rVec;
@@ -22,7 +21,7 @@ Vec3 DiskSamplerLinear::getVelocity(Vec3 pos,
   float a = -k / (h * h);
   float gdVal = -G * sigma0 * (a * (ra - h) * (ra - h) + k);
 
-  Vec3 gb = externalFieldBulgeHost(pos, center, rb, mb, G);
+  Vec3 gb = sphRadDecrFieldHost(pos, bulgeParams, G);
   Vec3 gd = gdVal * rVecxy / rVecxy.getMagnitude();
   Vec3 g = gb + gd;
   float gVal = g.getMagnitude();
@@ -42,9 +41,7 @@ float DiskSamplerLinear::sampleFromLinear(float rd) {
 
 DiskSamplerLinear::DiskSamplerLinear() : re(std::random_device{}()) {}
 
-std::vector<Vec3> DiskSamplerLinear::sample(Vec3 center,
-                                            float rb,
-                                            float mb,
+std::vector<Vec3> DiskSamplerLinear::sample(SphRadDecrFieldParams bulgeParams,
                                             float rd,
                                             float md,
                                             float thickness,
@@ -61,8 +58,8 @@ std::vector<Vec3> DiskSamplerLinear::sample(Vec3 center,
     float y = r * std::sin(phi);
     float z = (thickness / 2) * (2 * u(re) - 1);
 
-    state[i] = center + Vec3(x, y, z);
-    state[n + i] = getVelocity(state[i], center, rb, mb, rd, md, G);
+    state[i] = bulgeParams.center + Vec3(x, y, z);
+    state[n + i] = getVelocity(state[i], bulgeParams, rd, md, G);
   }
 
   return state;
