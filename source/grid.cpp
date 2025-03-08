@@ -23,6 +23,13 @@ Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
   std::memset(density.data(), 0, length * sizeof(std::complex<float>));
 }
 
+std::tuple<int, int, int> Grid::indexTripleFromFlat(int flatIndex) const {
+  int x = flatIndex % gridPoints;
+  int y = (flatIndex / gridPoints) % gridPoints;
+  int z = flatIndex / (gridPoints * gridPoints);
+  return std::make_tuple(x, y, z);
+}
+
 void Grid::assignDensity(int x, int y, int z, float d) {
   densityMutexes[getIndx(x, y, z)].lock();
   density[getIndx(x, y, z)] += d;
@@ -33,11 +40,15 @@ void Grid::clearDensity() {
   std::memset(density.data(), 0, length * sizeof(std::complex<float>));
 }
 
+float Grid::getDensity(int x, int y, int z) const {
+  return density[getIndx(x, y, z)].real();
+}
+
 void Grid::assignField(int x, int y, int z, Vec3 fieldVal) {
   field[getIndx(x, y, z)] = fieldVal;
 }
 
-Vec3 Grid::getField(int x, int y, int z) {
+Vec3 Grid::getField(int x, int y, int z) const {
   return field[getIndx(x, y, z)];
 }
 

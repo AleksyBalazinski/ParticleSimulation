@@ -17,6 +17,7 @@ class PMMethod {
   std::vector<Particle> particles;
   int N;
   std::function<Vec3(Vec3)> externalField;
+  std::function<float(Vec3)> externalPotential;
   float H;
   float DT;
   float G;
@@ -52,6 +53,7 @@ class PMMethod {
            const std::vector<float>& masses,
            const float effectiveBoxSize,
            const std::function<Vec3(Vec3)> externalField,
+           const std::function<float(Vec3)> externalPotential,
            const float H,
            const float DT,
            const float G,

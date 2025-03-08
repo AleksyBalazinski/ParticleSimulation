@@ -20,6 +20,10 @@ float densityToCodeUnits(float density, float DT, float G) {
   return DT * DT * 4 * std::numbers::pi_v<float> * G * density;
 }
 
+float densityToOriginalUnits(float density, float DT, float G) {
+  return density / (DT * DT * 4 * std::numbers::pi_v<float> * G);
+}
+
 void stateToCodeUnits(std::vector<Vec3>& state, float H, float DT) {
   int N = (int)state.size() / 2;
   std::transform(std::execution::par_unseq, state.begin(), state.begin() + N, state.begin(),
@@ -82,4 +86,8 @@ void integerStepVelocitiesToCodeUnits(std::vector<Particle>& particles, float H,
                 [H, DT](Particle& p) {
                   p.integerStepVelocity = velocityToCodeUntits(p.integerStepVelocity, H, DT);
                 });
+}
+
+float potentialToOriginalUnits(float potential, float H, float DT) {
+  return potential * H * H / (DT * DT);
 }

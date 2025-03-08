@@ -48,19 +48,6 @@ std::vector<float> randomMasses(int particlesCnt, std::pair<float, float> massRa
   return masses;
 }
 
-Vec3 externalFieldBulge(Vec3 pos, Vec3 bulge, float rb, float mb, float G) {
-  float r = (pos - bulge).getMagnitude();
-  Vec3 dir = (pos - bulge) / r;
-  float g;
-  if (r > rb) {
-    g = -G * mb / (r * r);
-  } else {
-    g = -(G * mb / std::powf(rb, 3)) * r * (4 - 3 * r / rb);
-  }
-
-  return g * dir;
-}
-
 float newton(std::function<float(float)> f,
              std::function<float(float)> df,
              float guess,

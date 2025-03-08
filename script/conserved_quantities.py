@@ -3,19 +3,19 @@ import numpy as np
 import sys
 
 # energy
-# energy_data = np.loadtxt(sys.argv[1])
-# ep = energy_data[:, 0]
-# ek = energy_data[:, 1]
-# e = ep + ek
-# time = np.arange(len(ep))
+energy_data = np.loadtxt(sys.argv[1])
+ep = energy_data[:, 0]
+ek = energy_data[:, 1]
+e = ep + ek
+time = np.arange(len(ep))
 
-# plt.figure(1)
-# plt.plot(time, ep, label='EP', color='red')
-# plt.plot(time, ek, label='EK', color='green')
-# plt.plot(time, e, label='E', color='blue')
-# plt.xlabel('Time')
-# plt.ylabel('Energy')
-# plt.legend()
+plt.figure(1)
+plt.plot(time, ep, label='EP', color='red')
+plt.plot(time, ek, label='EK', color='green')
+plt.plot(time, e, label='E', color='blue')
+plt.xlabel('Time')
+plt.ylabel('Energy')
+plt.legend()
 
 # momentum
 momentum_data = np.loadtxt(sys.argv[2])

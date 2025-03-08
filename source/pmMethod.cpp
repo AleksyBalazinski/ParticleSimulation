@@ -66,18 +66,14 @@ void PMMethod::findFourierPotential() {
 }
 
 void PMMethod::findFieldInCells() {
-  int dim = grid.getGridPoints();
-  auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
-  std::for_each(std::execution::par_unseq, gridRange.begin(), gridRange.end(),
-                [dim, this](int idx) {
-                  int x = idx % dim;
-                  int y = (idx / dim) % dim;
-                  int z = idx / (dim * dim);
-                  auto [fieldX, fieldY, fieldZ] = getFieldInCell(x, y, z, fds, grid);
+  auto gridRange = std::ranges::views::iota(0, grid.getLength());
+  std::for_each(std::execution::par_unseq, gridRange.begin(), gridRange.end(), [this](int idx) {
+    auto [x, y, z] = grid.indexTripleFromFlat(idx);
+    auto [fieldX, fieldY, fieldZ] = getFieldInCell(x, y, z, fds, grid);
 
-                  Vec3 fieldStrength(fieldX, fieldY, fieldZ);
-                  grid.assignField(x, y, z, fieldStrength);
-                });
+    Vec3 fieldStrength(fieldX, fieldY, fieldZ);
+    grid.assignField(x, y, z, fieldStrength);
+  });
 }
 
 void PMMethod::updateAccelerations() {
@@ -202,6 +198,7 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
                    const std::vector<float>& masses,
                    const float effectiveBoxSize,
                    const std::function<Vec3(Vec3)> externalField,
+                   const std::function<float(Vec3)> externalPotential,
                    const float H,
                    const float DT,
                    const float G,
@@ -210,6 +207,7 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
                    Grid& grid)
     : effectiveBoxSize(effectiveBoxSize),
       externalField(externalField),
+      externalPotential(externalPotential),
       H(H),
       DT(DT),
       G(G),
@@ -275,18 +273,13 @@ std::string PMMethod::run(const int simLength,
     stateToOriginalUnits(particles, H, DT);
 
     stateRecorder.recordPositions(particles);
-    // if (collectDiagnostics) {
-    //   stateRecorder.recordEnergy(
-    //       potentialEnergy(state.begin(), state.begin() + N, masses, G),
-    //       kineticEnergy(intStepVelocities.begin(), intStepVelocities.end(), masses, G));
-
-    //   stateRecorder.recordTotalMomentum(
-    //       totalMomentum(intStepVelocities.begin(), intStepVelocities.end(), masses));
-    // }
     if (collectDiagnostics) {
       auto expectedMomentum = simInfo.updateExpectedMomentum(totalExternalForceOrigUnits(), DT);
       stateRecorder.recordExpectedMomentum(expectedMomentum);
       stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
+      auto pe = SimInfo::potentialEnergy(grid, particles, externalPotential, H, DT, G);
+      auto ke = SimInfo::kineticEnergy(particles);
+      stateRecorder.recordEnergy(pe, ke);
     }
     if (escapedComputationalBox()) {
       std::cout << "Particle moved outside the computational box.\n";

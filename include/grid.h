@@ -2,6 +2,7 @@
 
 #include <complex>
 #include <mutex>
+#include <tuple>
 #include <vector>
 #include "fftAdapter.h"
 #include "vec3.h"
@@ -29,13 +30,17 @@ class Grid {
  public:
   Grid(int gridPoints, FFTAdapter<float>& fftAdapter);
 
+  std::tuple<int, int, int> indexTripleFromFlat(int flatIndex) const;
+
   void assignDensity(int x, int y, int z, float density);
 
   void clearDensity();
 
+  float getDensity(int x, int y, int z) const;
+
   void assignField(int x, int y, int z, Vec3 fieldVal);
 
-  Vec3 getField(int x, int y, int z);
+  Vec3 getField(int x, int y, int z) const;
 
   int getLength() const { return length; }
 

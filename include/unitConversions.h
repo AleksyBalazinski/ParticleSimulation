@@ -11,6 +11,8 @@ Vec3 accelerationToCodeUnits(const Vec3& a, float H, float DT);
 
 float densityToCodeUnits(float density, float DT, float G);
 
+float densityToOriginalUnits(float density, float DT, float G);
+
 void stateToCodeUnits(std::vector<Vec3>& state, float H, float DT);
 
 void stateToCodeUnits(std::vector<Particle>& particles, float H, float DT);
@@ -30,3 +32,5 @@ void velocitiesToOriginalUnits(std::vector<Vec3>& velocities, float H, float DT)
 void integerStepVelocitiesToOriginalUnits(std::vector<Particle>& particles, float H, float DT);
 
 void integerStepVelocitiesToCodeUnits(std::vector<Particle>& particles, float H, float DT);
+
+float potentialToOriginalUnits(float potential, float H, float DT);

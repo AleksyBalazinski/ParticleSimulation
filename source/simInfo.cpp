@@ -1,4 +1,5 @@
 #include "simInfo.h"
+#include "unitConversions.h"
 
 float SimInfo::totalEnergy(const std::vector<Vec3>& state,
                            const std::vector<float>& masses,
@@ -134,4 +135,35 @@ void SimInfo::setInitialMomentum(const std::vector<Particle>& particles) {
 Vec3 SimInfo::updateExpectedMomentum(Vec3 externalForce, float DT) {
   expectedMomentum += DT * externalForce;
   return expectedMomentum;
+}
+
+float SimInfo::potentialEnergy(const Grid& grid,
+                               const std::vector<Particle>& particles,
+                               std::function<float(Vec3)> externalPotential,
+                               float H,
+                               float DT,
+                               float G) {
+  float internal = 0;
+  for (int i = 0; i < grid.getLength(); ++i) {
+    auto [x, y, z] = grid.indexTripleFromFlat(i);
+    internal += densityToOriginalUnits(grid.getDensity(x, y, z), DT, G) *
+                potentialToOriginalUnits(grid.getPotential(x, y, z), H, DT);
+  }
+
+  float external = 0;
+  for (const auto& p : particles) {
+    external += p.mass * externalPotential(p.position);
+  }
+
+  float vol = H * H * H;
+  return 0.5f * vol * internal + external;
+}
+
+float SimInfo::kineticEnergy(const std::vector<Particle>& particles) {
+  float ke = 0;
+  for (const auto& p : particles) {
+    ke += 0.5f * p.mass * p.velocity.getMagnitudeSquared();
+  }
+
+  return ke;
 }

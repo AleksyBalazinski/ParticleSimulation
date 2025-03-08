@@ -7,11 +7,11 @@
 	simInfo.cpp
 	grid.cpp
 	unitConversions.cpp
-	sphericalSampler.cpp
 	utils.cpp
 	diskSampler.cpp
 	diskSamplerLinear.cpp
 	particle.cpp
+	externalFields.cpp
 )
 
 target_include_directories(ParticleSimulation

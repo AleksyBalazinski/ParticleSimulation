@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <vector>
+#include "grid.h"
 #include "particle.h"
 #include "vec3.h"
 
@@ -45,4 +47,13 @@ class SimInfo {
   void setInitialMomentum(const std::vector<Particle>& particles);
 
   Vec3 updateExpectedMomentum(Vec3 externalForce, float DT);
+
+  static float potentialEnergy(const Grid& grid,
+                               const std::vector<Particle>& particles,
+                               std::function<float(Vec3)> externalPotential,
+                               float H,
+                               float DT,
+                               float G);
+
+  static float kineticEnergy(const std::vector<Particle>& particles);
 };

@@ -1,5 +1,6 @@
 ﻿#include <iostream>
 #include "diskSamplerLinear.h"
+#include "externalFields.h"
 #include "grid.h"
 #include "kissFFTAdapter.h"
 #include "pmMethod.h"
@@ -27,7 +28,10 @@ int main() {
 
   std::vector<float> masses(n, md / n);
   auto externalField = [galaxyCenter, rb, mb, G](Vec3 pos) -> Vec3 {
-    return externalFieldBulge(pos, galaxyCenter, rb, mb, G);
+    return sphRadDecrField(pos, galaxyCenter, rb, mb, G);
+  };
+  auto externalPotential = [galaxyCenter, rb, mb, G](Vec3 pos) -> float {
+    return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
   };
 
   int gridPoints = 64;
@@ -38,8 +42,8 @@ int main() {
   float H = effectiveBoxSize / (gridPoints / 2);
   float DT = 1;
 
-  PMMethod pm(state, masses, effectiveBoxSize, externalField, H, DT, G, InterpolationScheme::CIC,
-              FiniteDiffScheme::TWO_POINT, grid);
+  PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+              InterpolationScheme::CIC, FiniteDiffScheme::TWO_POINT, grid);
 
   pm.run(200, true /*diagnostics*/);
 }
