@@ -15,6 +15,7 @@ Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
       length(gridPoints * gridPoints * gridPoints),
       field(length),
       density(length),
+      densityMutexes(length),
       densityFourier(length),
       potential(length),
       potentialFourier(length),
@@ -23,7 +24,9 @@ Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
 }
 
 void Grid::assignDensity(int x, int y, int z, float d) {
+  densityMutexes[getIndx(x, y, z)].lock();
   density[getIndx(x, y, z)] += d;
+  densityMutexes[getIndx(x, y, z)].unlock();
 }
 
 void Grid::clearDensity() {

@@ -3,6 +3,7 @@
 #include <functional>
 #include <vector>
 #include "grid.h"
+#include "particle.h"
 #include "stateRecorder.h"
 #include "vec3.h"
 
@@ -13,10 +14,7 @@ class PMMethod {
  private:
   Grid& grid;
   float effectiveBoxSize;
-  std::vector<Vec3>& state;
-  std::vector<float>& masses;
-  std::vector<Vec3> accelerations;
-  std::vector<Vec3> intStepVelocities;
+  std::vector<Particle> particles;
   int N;
   std::function<Vec3(Vec3)> externalField;
   float H;
@@ -25,9 +23,9 @@ class PMMethod {
   InterpolationScheme is;
   FiniteDiffScheme fds;
 
-  void reassignDensity();
+  void spreadMass();
 
-  Vec3 interpolateField(float x, float y, float z);
+  Vec3 interpolateField(Vec3 position);
 
   void setHalfVelocities();
 
@@ -46,15 +44,15 @@ class PMMethod {
   bool escapedComputationalBox();
 
  public:
-  PMMethod(std::vector<Vec3>& state,
-           std::vector<float>& masses,
-           float effectiveBoxSize,
-           std::function<Vec3(Vec3)> externalField,
-           float H,
-           float DT,
-           float G,
-           InterpolationScheme is,
-           FiniteDiffScheme fds,
+  PMMethod(const std::vector<Vec3>& state,
+           const std::vector<float>& masses,
+           const float effectiveBoxSize,
+           const std::function<Vec3(Vec3)> externalField,
+           const float H,
+           const float DT,
+           const float G,
+           const InterpolationScheme is,
+           const FiniteDiffScheme fds,
            Grid& grid);
 
   std::string run(const int simLength,

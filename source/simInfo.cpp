@@ -33,6 +33,20 @@ float potentialEnergy(std::vector<Vec3>::iterator posBegin,
   return potentialEnergy;
 }
 
+float potentialEnergy(const std::vector<Particle>& particles, float G) {
+  const int n = (int)particles.size();
+  float potentialEnergy = 0;
+
+  for (int i = 0; i < n; ++i) {
+    for (int j = i + 1; j < n; ++j) {
+      auto rij = particles[i].position - particles[j].position;
+      potentialEnergy += -1 * G * particles[i].mass * particles[j].mass / rij.getMagnitude();
+    }
+  }
+
+  return potentialEnergy;
+}
+
 float kineticEnergy(std::vector<Vec3>::iterator vBegin,
                     std::vector<Vec3>::iterator vEnd,
                     const std::vector<float>& masses,
@@ -43,6 +57,17 @@ float kineticEnergy(std::vector<Vec3>::iterator vBegin,
   auto vIt = vBegin;
   for (int i = 0; vIt != vEnd; ++vIt, ++i) {
     kineticEnergy += 0.5f * masses[i] * vIt->getMagnitudeSquared();
+  }
+
+  return kineticEnergy;
+}
+
+float kineticEnergy(const std::vector<Particle>& particles, float G) {
+  const int n = (int)particles.size();
+  float kineticEnergy = 0;
+
+  for (const auto& p : particles) {
+    kineticEnergy += 0.5f * p.mass * p.velocity.getMagnitudeSquared();
   }
 
   return kineticEnergy;
@@ -88,6 +113,14 @@ Vec3 totalMomentum(std::vector<Vec3>::iterator vBegin,
   auto vIt = vBegin;
   for (int i = 0; vIt != vEnd; ++vIt, ++i) {
     momentum += masses[i] * (*vIt);
+  }
+  return momentum;
+}
+
+Vec3 totalMomentum(const std::vector<Particle>& particles) {
+  Vec3 momentum;
+  for (const auto& p : particles) {
+    momentum += p.mass * p.velocity;
   }
   return momentum;
 }

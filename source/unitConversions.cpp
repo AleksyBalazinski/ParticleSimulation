@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <execution>
 #include <numbers>
+#include "particle.h"
 
 Vec3 positionToCodeUntits(const Vec3& pos, float H) {
   return pos / H;
@@ -27,6 +28,14 @@ void stateToCodeUnits(std::vector<Vec3>& state, float H, float DT) {
                  [H, DT](const Vec3& v) { return velocityToCodeUntits(v, H, DT); });
 }
 
+void stateToCodeUnits(std::vector<Particle>& particles, float H, float DT) {
+  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
+                [H, DT](Particle& p) {
+                  p.position = positionToCodeUntits(p.position, H);
+                  p.velocity = velocityToCodeUntits(p.velocity, H, DT);
+                });
+}
+
 void velocitiesToCodeUnits(std::vector<Vec3>& velocities, float H, float DT) {
   std::transform(velocities.begin(), velocities.end(), velocities.begin(),
                  [H, DT](const Vec3& v) { return velocityToCodeUntits(v, H, DT); });
@@ -46,6 +55,14 @@ void stateToOriginalUnits(std::vector<Vec3>& state, float H, float DT) {
                  [H](const Vec3& pos) { return positionToOriginalUnits(pos, H); });
   std::transform(std::execution::par_unseq, state.begin() + N, state.end(), state.begin() + N,
                  [H, DT](const Vec3& v) { return velocityToOriginalUnits(v, H, DT); });
+}
+
+void stateToOriginalUnits(std::vector<Particle>& particles, float H, float DT) {
+  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
+                [H, DT](Particle& p) {
+                  p.position = positionToOriginalUnits(p.position, H);
+                  p.velocity = velocityToOriginalUnits(p.velocity, H, DT);
+                });
 }
 
 void velocitiesToOriginalUnits(std::vector<Vec3>& velocities, float H, float DT) {

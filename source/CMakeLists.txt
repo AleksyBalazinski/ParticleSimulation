@@ -11,6 +11,7 @@
 	utils.cpp
 	diskSampler.cpp
 	diskSamplerLinear.cpp
+	particle.cpp
 )
 
 target_include_directories(ParticleSimulation

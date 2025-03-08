@@ -3,6 +3,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include "particle.h"
 #include "vec3.h"
 
 class StateRecorder {
@@ -40,6 +41,7 @@ class StateRecorder {
                 int maxRecords = 500);
   ~StateRecorder();
   void recordPositions(std::vector<Vec3>::iterator begin, std::vector<Vec3>::iterator end);
+  void recordPositions(const std::vector<Particle>& particles);
   void recordEnergy(float pe, float ke);
   void recordTotalMomentum(Vec3 momentum);
   std::string flush();

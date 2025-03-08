@@ -35,7 +35,16 @@ StateRecorder::~StateRecorder() {
 void StateRecorder::recordPositions(std::vector<Vec3>::iterator begin,
                                     std::vector<Vec3>::iterator end) {
   for (auto it = begin; it != end; ++it) {
-    positionsStr += it->toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
+    positionsStr += it->toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize) + '\n';
+  }
+  positionsStr += "\n\n";
+  ++positionsRecordsCnt;
+  saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
+}
+
+void StateRecorder::recordPositions(const std::vector<Particle>& particles) {
+  for (const auto& p : particles) {
+    positionsStr += p.position.toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
     positionsStr += '\n';
     ++positionsRecordsCnt;
     saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);

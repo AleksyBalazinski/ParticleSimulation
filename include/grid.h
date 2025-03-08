@@ -1,6 +1,7 @@
 #pragma once
 
 #include <complex>
+#include <mutex>
 #include <vector>
 #include "fftAdapter.h"
 #include "vec3.h"
@@ -18,6 +19,7 @@ class Grid {
   long getIndx(int i, int j, int k) const;
 
   std::vector<std::complex<float>> density;
+  std::vector<std::mutex> densityMutexes;
   std::vector<std::complex<float>> densityFourier;
   std::vector<std::complex<float>> potential;
   std::vector<std::complex<float>> potentialFourier;
