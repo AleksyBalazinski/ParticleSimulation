@@ -41,5 +41,5 @@ int main() {
   PMMethod pm(state, masses, effectiveBoxSize, externalField, H, DT, G, InterpolationScheme::CIC,
               FiniteDiffScheme::TWO_POINT, grid);
 
-  pm.run(200);
+  pm.run(200, true /*diagnostics*/);
 }

@@ -69,3 +69,17 @@ void velocitiesToOriginalUnits(std::vector<Vec3>& velocities, float H, float DT)
   std::transform(velocities.begin(), velocities.end(), velocities.begin(),
                  [H, DT](const Vec3& v) { return velocityToOriginalUnits(v, H, DT); });
 }
+
+void integerStepVelocitiesToOriginalUnits(std::vector<Particle>& particles, float H, float DT) {
+  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
+                [H, DT](Particle& p) {
+                  p.integerStepVelocity = velocityToOriginalUnits(p.integerStepVelocity, H, DT);
+                });
+}
+
+void integerStepVelocitiesToCodeUnits(std::vector<Particle>& particles, float H, float DT) {
+  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
+                [H, DT](Particle& p) {
+                  p.integerStepVelocity = velocityToCodeUntits(p.integerStepVelocity, H, DT);
+                });
+}

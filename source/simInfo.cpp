@@ -1,6 +1,8 @@
 #include "simInfo.h"
 
-float totalEnergy(const std::vector<Vec3>& state, const std::vector<float>& masses, float G) {
+float SimInfo::totalEnergy(const std::vector<Vec3>& state,
+                           const std::vector<float>& masses,
+                           float G) {
   const int n = (int)masses.size();
   float potentialEnergy = 0;
   float kineticEnergy = 0;
@@ -15,10 +17,10 @@ float totalEnergy(const std::vector<Vec3>& state, const std::vector<float>& mass
   return potentialEnergy + kineticEnergy;
 }
 
-float potentialEnergy(std::vector<Vec3>::iterator posBegin,
-                      std::vector<Vec3>::iterator posEnd,
-                      const std::vector<float>& masses,
-                      float G) {
+float SimInfo::potentialEnergy(std::vector<Vec3>::iterator posBegin,
+                               std::vector<Vec3>::iterator posEnd,
+                               const std::vector<float>& masses,
+                               float G) {
   const int n = (int)masses.size();
   float potentialEnergy = 0;
   auto posIt = posBegin;
@@ -33,7 +35,7 @@ float potentialEnergy(std::vector<Vec3>::iterator posBegin,
   return potentialEnergy;
 }
 
-float potentialEnergy(const std::vector<Particle>& particles, float G) {
+float SimInfo::potentialEnergy(const std::vector<Particle>& particles, float G) {
   const int n = (int)particles.size();
   float potentialEnergy = 0;
 
@@ -47,10 +49,10 @@ float potentialEnergy(const std::vector<Particle>& particles, float G) {
   return potentialEnergy;
 }
 
-float kineticEnergy(std::vector<Vec3>::iterator vBegin,
-                    std::vector<Vec3>::iterator vEnd,
-                    const std::vector<float>& masses,
-                    float G) {
+float SimInfo::kineticEnergy(std::vector<Vec3>::iterator vBegin,
+                             std::vector<Vec3>::iterator vEnd,
+                             const std::vector<float>& masses,
+                             float G) {
   const int n = (int)masses.size();
   float kineticEnergy = 0;
 
@@ -62,7 +64,7 @@ float kineticEnergy(std::vector<Vec3>::iterator vBegin,
   return kineticEnergy;
 }
 
-float kineticEnergy(const std::vector<Particle>& particles, float G) {
+float SimInfo::kineticEnergy(const std::vector<Particle>& particles, float G) {
   const int n = (int)particles.size();
   float kineticEnergy = 0;
 
@@ -73,12 +75,12 @@ float kineticEnergy(const std::vector<Particle>& particles, float G) {
   return kineticEnergy;
 }
 
-float totalEnergy(std::vector<Vec3>::iterator posBegin,
-                  std::vector<Vec3>::iterator posEnd,
-                  std::vector<Vec3>::iterator vBegin,
-                  std::vector<Vec3>::iterator vEnd,
-                  const std::vector<float>& masses,
-                  float G) {
+float SimInfo::totalEnergy(std::vector<Vec3>::iterator posBegin,
+                           std::vector<Vec3>::iterator posEnd,
+                           std::vector<Vec3>::iterator vBegin,
+                           std::vector<Vec3>::iterator vEnd,
+                           const std::vector<float>& masses,
+                           float G) {
   const int n = (int)masses.size();
   float potentialEnergy = 0;
   float kineticEnergy = 0;
@@ -97,7 +99,7 @@ float totalEnergy(std::vector<Vec3>::iterator posBegin,
   return potentialEnergy + kineticEnergy;
 }
 
-Vec3 totalMomentum(const std::vector<Vec3>& state, const std::vector<float>& masses) {
+Vec3 SimInfo::totalMomentum(const std::vector<Vec3>& state, const std::vector<float>& masses) {
   const int n = (int)masses.size();
   Vec3 momentum;
   for (int i = 0; i < n; i++) {
@@ -106,9 +108,9 @@ Vec3 totalMomentum(const std::vector<Vec3>& state, const std::vector<float>& mas
   return momentum;
 }
 
-Vec3 totalMomentum(std::vector<Vec3>::iterator vBegin,
-                   std::vector<Vec3>::iterator vEnd,
-                   const std::vector<float>& masses) {
+Vec3 SimInfo::totalMomentum(std::vector<Vec3>::iterator vBegin,
+                            std::vector<Vec3>::iterator vEnd,
+                            const std::vector<float>& masses) {
   Vec3 momentum;
   auto vIt = vBegin;
   for (int i = 0; vIt != vEnd; ++vIt, ++i) {
@@ -117,10 +119,19 @@ Vec3 totalMomentum(std::vector<Vec3>::iterator vBegin,
   return momentum;
 }
 
-Vec3 totalMomentum(const std::vector<Particle>& particles) {
+Vec3 SimInfo::totalMomentum(const std::vector<Particle>& particles) {
   Vec3 momentum;
   for (const auto& p : particles) {
-    momentum += p.mass * p.velocity;
+    momentum += p.mass * p.integerStepVelocity;
   }
   return momentum;
+}
+
+void SimInfo::setInitialMomentum(const std::vector<Particle>& particles) {
+  expectedMomentum = totalMomentum(particles);
+}
+
+Vec3 SimInfo::updateExpectedMomentum(Vec3 externalForce, float DT) {
+  expectedMomentum += DT * externalForce;
+  return expectedMomentum;
 }

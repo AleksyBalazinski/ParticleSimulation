@@ -11,17 +11,21 @@ class StateRecorder {
   std::string positionsStr;
   std::string energyStr;
   std::string momentumStr;
+  std::string expectedMomentumStr;
 
   std::ofstream positionsFile;
   std::ofstream energyFile;
   std::ofstream momentumFile;
+  std::ofstream expectedMomentumFile;
 
   const char* energyPath;
   const char* momentumPath;
+  const char* expectedMomentumPath;
   const char* positionsPath;
 
   int energyRecordsCnt = 0;
   int momentumRecordsCnt = 0;
+  int expectedMomentumRecordsCnt = 0;
   int positionsRecordsCnt = 0;
 
   int maxRecords;
@@ -38,11 +42,13 @@ class StateRecorder {
   StateRecorder(const char* positionsPath,
                 const char* energyPath,
                 const char* momentumPath,
+                const char* expectedMomentumPath,
                 int maxRecords = 500);
   ~StateRecorder();
   void recordPositions(std::vector<Vec3>::iterator begin, std::vector<Vec3>::iterator end);
   void recordPositions(const std::vector<Particle>& particles);
   void recordEnergy(float pe, float ke);
   void recordTotalMomentum(Vec3 momentum);
+  void recordExpectedMomentum(Vec3 expectedMomentum);
   std::string flush();
 };

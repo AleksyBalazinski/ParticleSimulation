@@ -29,6 +29,8 @@ class PMMethod {
 
   void setHalfVelocities();
 
+  void setIntegerStepVelocities();
+
   void updateVelocities();
 
   void updatePositions();
@@ -42,6 +44,8 @@ class PMMethod {
   void updateAccelerations();
 
   bool escapedComputationalBox();
+
+  Vec3 totalExternalForceOrigUnits();
 
  public:
   PMMethod(const std::vector<Vec3>& state,
@@ -59,5 +63,6 @@ class PMMethod {
                   bool collectDiagnostics = false,
                   const char* positionsPath = "output.txt",
                   const char* energyPath = "energy.txt",
-                  const char* momentumPath = "momentum.txt");
+                  const char* momentumPath = "momentum.txt",
+                  const char* expectedMomentumPath = "expected_momentum.txt");
 };

@@ -82,7 +82,9 @@ void PMMethod::findFieldInCells() {
 
 void PMMethod::updateAccelerations() {
   std::for_each(std::execution::par_unseq, particles.begin(), particles.end(), [this](Particle& p) {
-    p.acceleration = interpolateField(p.position) + externalField(p.position);
+    p.acceleration =
+        interpolateField(p.position) +
+        accelerationToCodeUnits(externalField(positionToOriginalUnits(p.position, H)), H, DT);
   });
 }
 
@@ -99,6 +101,14 @@ bool PMMethod::escapedComputationalBox() {
   return std::any_of(
       std::execution::par_unseq, particles.begin(), particles.end(),
       [this](const Particle& p) { return !isWithingBox(p.position, effectiveBoxSize); });
+}
+
+Vec3 PMMethod::totalExternalForceOrigUnits() {
+  Vec3 f;
+  std::for_each(std::execution::seq, particles.begin(), particles.end(),
+                [this, &f](const Particle& p) { f += p.mass * externalField(p.position); });
+
+  return f;
 }
 
 void PMMethod::spreadMass() {
@@ -188,18 +198,6 @@ Vec3 PMMethod::interpolateField(Vec3 position) {
   }
 }
 
-void setIntegerVelocities(std::vector<Vec3>& intVs,
-                          const std::vector<Vec3>& state,
-                          const std::vector<float>& masses,
-                          float G,
-                          float h,
-                          const std::vector<Vec3>& accelerations) {
-  int n = (int)intVs.size();
-  for (int i = 0; i < n; i++) {
-    intVs[i] = state[n + i] + 0.5f * h * accelerations[i];
-  }
-}
-
 PMMethod::PMMethod(const std::vector<Vec3>& state,
                    const std::vector<float>& masses,
                    const float effectiveBoxSize,
@@ -210,10 +208,14 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
                    const InterpolationScheme is,
                    const FiniteDiffScheme fds,
                    Grid& grid)
-    : effectiveBoxSize(effectiveBoxSize), H(H), DT(DT), G(G), is(is), fds(fds), grid(grid) {
-  this->externalField = [DT, H, externalField](Vec3 pos) -> Vec3 {
-    return accelerationToCodeUnits(externalField(positionToOriginalUnits(pos, H)), H, DT);
-  };
+    : effectiveBoxSize(effectiveBoxSize),
+      externalField(externalField),
+      H(H),
+      DT(DT),
+      G(G),
+      is(is),
+      fds(fds),
+      grid(grid) {
   this->N = static_cast<int>(masses.size());
   for (int i = 0; i < N; ++i) {
     this->particles.emplace_back(state[i], state[N + i], masses[i]);
@@ -223,6 +225,12 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
 void PMMethod::setHalfVelocities() {
   std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
                 [this](Particle& p) { p.velocity += 0.5 * p.acceleration; });
+}
+
+void PMMethod::setIntegerStepVelocities() {
+  std::for_each(std::execution::par, particles.begin(), particles.end(), [this](Particle& p) {
+    p.integerStepVelocity = p.velocity + 0.5f * p.acceleration;
+  });
 }
 
 void PMMethod::updateVelocities() {
@@ -239,8 +247,14 @@ std::string PMMethod::run(const int simLength,
                           bool collectDiagnostics,
                           const char* positionsPath,
                           const char* energyPath,
-                          const char* momentumPath) {
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath);
+                          const char* momentumPath,
+                          const char* expectedMomentumPath) {
+  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath);
+  SimInfo simInfo;
+
+  if (collectDiagnostics) {
+    simInfo.setInitialMomentum(particles);
+  }
 
   stateToCodeUnits(particles, H, DT);
   pmMethodStep();
@@ -253,13 +267,12 @@ std::string PMMethod::run(const int simLength,
 
     updatePositions();
 
-    // if (collectDiagnostics) {
-    //   setIntegerVelocities(intStepVelocities, state, masses, G, 1, accelerations);
-    // }
+    if (collectDiagnostics) {
+      setIntegerStepVelocities();
+      integerStepVelocitiesToOriginalUnits(particles, H, DT);
+    }
+
     stateToOriginalUnits(particles, H, DT);
-    // if (collectDiagnostics) {
-    //   velocitiesToOriginalUnits(intStepVelocities, H, DT);
-    // }
 
     stateRecorder.recordPositions(particles);
     // if (collectDiagnostics) {
@@ -270,15 +283,20 @@ std::string PMMethod::run(const int simLength,
     //   stateRecorder.recordTotalMomentum(
     //       totalMomentum(intStepVelocities.begin(), intStepVelocities.end(), masses));
     // }
+    if (collectDiagnostics) {
+      auto expectedMomentum = simInfo.updateExpectedMomentum(totalExternalForceOrigUnits(), DT);
+      stateRecorder.recordExpectedMomentum(expectedMomentum);
+      stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
+    }
     if (escapedComputationalBox()) {
       std::cout << "Particle moved outside the computational box.\n";
       break;
     }
 
     stateToCodeUnits(particles, H, DT);
-    // if (collectDiagnostics) {
-    //   velocitiesToCodeUnits(intStepVelocities, H, DT);
-    // }
+    if (collectDiagnostics) {
+      integerStepVelocitiesToCodeUnits(particles, H, DT);
+    }
 
     pmMethodStep();
 
