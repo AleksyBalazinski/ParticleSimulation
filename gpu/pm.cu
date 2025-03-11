@@ -6,21 +6,49 @@
 #include "common.h"
 #include "conversions.cuh"
 #include "disk_sampler_linear.cuh"
+#include "external_fields.cuh"
 #include "helper_macros.h"
 #include "state_recorder.cuh"
 #include "utils.cuh"
 
 #define CELLS_CNT ((NG) * (NG) * (NG))
+#define BLOCK_SIZE 1024
+#define BLOCK_SIZE_X 16
+#define BLOCK_SIZE_Y 8
+#define BLOCK_SIZE_Z 8
 #define NUM_BLOCKS(n) (((BLOCK_SIZE) + (n) - 1) / (BLOCK_SIZE))
 #define GRID_IDX(x, y, z) ((x) + (y) * (NG) + (z) * (NG) * (NG))
-#define GROUP_SIZE 2
 #define USE_SMEM
 
-__device__ int mod(int a, int b) {
+float reassignDensityMs = 0;
+float forwardFFTMs = 0;
+float findFourierPotentialMs = 0;
+float inverseFFTMs = 0;
+float scaleAfterInverseMs = 0;
+float findFieldInCellsMs = 0;
+float updateAccelerationsMs = 0;
+
+cudaEvent_t reassignDensityStart, reassignDensityStop;
+cudaEvent_t forwardFFTStart, forwardFFTStop;
+cudaEvent_t findFourierPotentialStart, findFourierPotentialStop;
+cudaEvent_t inverseFFTStart, inverseFFTStop;
+cudaEvent_t scaleAfterInverseStart, scaleAfterInverseStop;
+cudaEvent_t findFieldInCellsStart, findFieldInCellsStop;
+cudaEvent_t updateAccelerationsStart, updateAccelerationsStop;
+
+dim3 block;
+dim3 grid;
+
+float pmTimeMs = 0;
+float memcpyTimeMs = 0;
+float boundsCheckTimeMs = 0;
+float recordStateTimeMs = 0;
+
+__device__ inline int mod(int a, int b) {
   return (a % b + b) % b;
 }
 
-__device__ int modIndex(int i, int j, int k) {
+__device__ inline int modIndex(int i, int j, int k) {
   return mod(i, NG) + mod(j, NG) * NG + mod(k, NG) * NG * NG;
 }
 
@@ -90,18 +118,6 @@ __global__ void findFourierPotential(cufftComplex* potentialFourier,
   }
 }
 
-__device__ Vec3 getFieldInCell(int x, int y, int z, cufftComplex* gridPotential) {
-  Vec3 field;
-  field.x =
-      -0.5f * (gridPotential[modIndex(x + 1, y, z)].x - gridPotential[modIndex(x - 1, y, z)].x);
-  field.y =
-      -0.5f * (gridPotential[modIndex(x, y + 1, z)].x - gridPotential[modIndex(x, y - 1, z)].x);
-  field.z =
-      -0.5f * (gridPotential[modIndex(x, y, z + 1)].x - gridPotential[modIndex(x, y, z - 1)].x);
-
-  return field;
-}
-
 __global__ void scaleAfterInverse(cufftComplex* gridPotential) {
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < CELLS_CNT;
        idx += gridDim.x * blockDim.x) {
@@ -109,20 +125,9 @@ __global__ void scaleAfterInverse(cufftComplex* gridPotential) {
   }
 }
 
-const int blockSizeX = 16;
-const int blockSizeY = 8;
-const int blockSizeZ = 8;
-
 __global__ void findFieldInCells(Vec3* gridField, cufftComplex* gridPotential) {
 #ifdef USE_SMEM
-  const int blockSizeX = 16;
-  const int blockSizeY = 8;
-  const int blockSizeZ = 8;
-
-  __shared__ float smem_potential[blockSizeX + 2][blockSizeY + 2][blockSizeZ + 2];
-  int x = threadIdx.x + 1;
-  int y = threadIdx.y + 1;
-  int z = threadIdx.z + 1;
+  __shared__ float smem_potential[BLOCK_SIZE_X + 2][BLOCK_SIZE_Y + 2][BLOCK_SIZE_Z + 2];
 #endif
   int idx = threadIdx.x + blockDim.x * blockIdx.x;
   int idy = threadIdx.y + blockDim.y * blockIdx.y;
@@ -130,86 +135,51 @@ __global__ void findFieldInCells(Vec3* gridField, cufftComplex* gridPotential) {
 
   if ((idx < NG) && (idy < NG) && (idz < NG)) {
 #ifdef USE_SMEM
+    int x = threadIdx.x + 1;
+    int y = threadIdx.y + 1;
+    int z = threadIdx.z + 1;
+
     smem_potential[x][y][z] = gridPotential[GRID_IDX(idx, idy, idz)].x;
-    if (threadIdx.x == 0) {
-      smem_potential[0][y][z] = gridPotential[modIndex(idx - 1, idy, idz)].x;
-      smem_potential[blockSizeX + 1][y][z] = gridPotential[modIndex(idx + blockSizeX, idy, idz)].x;
-    }
-    if (threadIdx.y == 0) {
-      smem_potential[x][0][z] = gridPotential[modIndex(idx, idy - 1, idz)].x;
-      smem_potential[x][blockSizeY + 1][z] = gridPotential[modIndex(idx, idy + blockSizeY, idz)].x;
-    }
-    if (threadIdx.z == 0) {
-      smem_potential[x][y][0] = gridPotential[modIndex(idx, idy, idz - 1)].x;
-      smem_potential[x][y][blockSizeZ + 1] = gridPotential[modIndex(idx, idy, idz + blockSizeZ)].x;
-    }
-    if (threadIdx.x == 0 && threadIdx.y == 0) {
-      smem_potential[0][0][z] = gridPotential[modIndex(idx - 1, idy - 1, idz)].x;
-      smem_potential[0][blockSizeY + 1][z] =
-          gridPotential[modIndex(idx - 1, idy + blockSizeY, idz)].x;
-      smem_potential[blockSizeX + 1][0][z] =
-          gridPotential[modIndex(idx + blockSizeX, idy - 1, idz)].x;
-      smem_potential[blockSizeX + 1][blockSizeY + 1][z] =
-          gridPotential[modIndex(idx + blockSizeX, idy + blockSizeY, idz)].x;
-    }
-    if (threadIdx.x == 0 && threadIdx.z == 0) {
-      smem_potential[0][y][0] = gridPotential[modIndex(idx - 1, idy, idz - 1)].x;
-      smem_potential[0][y][blockSizeZ + 1] =
-          gridPotential[modIndex(idx - 1, idy, idz + blockSizeZ)].x;
-      smem_potential[blockSizeX + 1][y][0] =
-          gridPotential[modIndex(idx + blockSizeX, idy, idz - 1)].x;
-      smem_potential[blockSizeX + 1][y][blockSizeZ + 1] =
-          gridPotential[modIndex(idx + blockSizeX, idy, idz + blockSizeZ)].x;
-    }
-    if (threadIdx.y == 0 && threadIdx.z == 0) {
-      smem_potential[x][0][0] = gridPotential[modIndex(idx, idy - 1, idz - 1)].x;
-      smem_potential[x][0][blockSizeZ + 1] =
-          gridPotential[modIndex(idx, idy - 1, idz + blockSizeZ)].x;
-      smem_potential[x][blockSizeY + 1][0] =
-          gridPotential[modIndex(idx, idy + blockSizeY, idz - 1)].x;
-      smem_potential[x][blockSizeY + 1][blockSizeZ + 1] =
-          gridPotential[modIndex(idx, idy + blockSizeY, idz + blockSizeZ)].x;
-    }
-    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-      smem_potential[0][0][0] = gridPotential[modIndex(idx - 1, idy - 1, idz - 1)].x;
-      smem_potential[0][0][blockSizeZ + 1] =
-          gridPotential[modIndex(idx - 1, idy - 1, idz + blockSizeZ)].x;
-      smem_potential[0][blockSizeY + 1][0] =
-          gridPotential[modIndex(idx - 1, idy + blockSizeY, idz - 1)].x;
-      smem_potential[blockSizeX + 1][0][0] =
-          gridPotential[modIndex(idx + blockSizeX, idy - 1, idz - 1)].x;
-      smem_potential[0][blockSizeY + 1][blockSizeZ + 1] =
-          gridPotential[modIndex(idx - 1, idy + blockSizeY, idz + blockSizeZ)].x;
-      smem_potential[blockSizeX + 1][0][blockSizeZ + 1] =
-          gridPotential[modIndex(idx + blockSizeX, idy - 1, idz + blockSizeZ)].x;
-      smem_potential[blockSizeX + 1][blockSizeY + 1][0] =
-          gridPotential[modIndex(idx + blockSizeX, idy + blockSizeY, idz - 1)].x;
-      smem_potential[blockSizeX + 1][blockSizeY + 1][blockSizeZ + 1] =
-          gridPotential[modIndex(idx + blockSizeX, idy + blockSizeY, idz + blockSizeZ)].x;
-    }
 
     __syncthreads();
 
-    gridField[GRID_IDX(idx, idy, idz)].x =
-        -0.5f * (smem_potential[x + 1][y][z] - smem_potential[x - 1][y][z]);
-    gridField[GRID_IDX(idx, idy, idz)].y =
-        -0.5f * (smem_potential[x][y + 1][z] - smem_potential[x][y - 1][z]);
-    gridField[GRID_IDX(idx, idy, idz)].z =
-        -0.5f * (smem_potential[x][y][z + 1] - smem_potential[x][y][z - 1]);
+    float xl, yl, zl;
+    float xr, yr, zr;
+
+    xl = (x == 1) ? gridPotential[modIndex(idx - 1, idy, idz)].x : smem_potential[x - 1][y][z];
+    yl = (y == 1) ? gridPotential[modIndex(idx, idy - 1, idz)].x : smem_potential[x][y - 1][z];
+    zl = (z == 1) ? gridPotential[modIndex(idx, idy, idz - 1)].x : smem_potential[x][y][z - 1];
+    xr = (x == BLOCK_SIZE_X) ? gridPotential[modIndex(idx + 1, idy, idz)].x
+                             : smem_potential[x + 1][y][z];
+    yr = (y == BLOCK_SIZE_Y) ? gridPotential[modIndex(idx, idy + 1, idz)].x
+                             : smem_potential[x][y + 1][z];
+    zr = (z == BLOCK_SIZE_Z) ? gridPotential[modIndex(idx, idy, idz + 1)].x
+                             : smem_potential[x][y][z + 1];
+
+    gridField[GRID_IDX(idx, idy, idz)].x = -0.5f * (xr - xl);
+    gridField[GRID_IDX(idx, idy, idz)].y = -0.5f * (yr - yl);
+    gridField[GRID_IDX(idx, idy, idz)].z = -0.5f * (zr - zl);
 #else
-    gridField[GRID_IDX(idx, idy, idz)] = getFieldInCell(idx, idy, idz, gridPotential);
+    float xl, yl, zl;
+    float xr, yr, zr;
+
+    xl = (idx == 0) ? gridPotential[modIndex(idx - 1, idy, idz)].x
+                    : gridPotential[GRID_IDX(idx - 1, idy, idz)].x;
+    yl = (idy == 0) ? gridPotential[modIndex(idx, idy - 1, idz)].x
+                    : gridPotential[GRID_IDX(idx, idy - 1, idz)].x;
+    zl = (idz == 0) ? gridPotential[modIndex(idx, idy, idz - 1)].x
+                    : gridPotential[GRID_IDX(idx, idy, idz - 1)].x;
+    xr = (idx == NG - 1) ? gridPotential[modIndex(idx + 1, idy, idz)].x
+                         : gridPotential[GRID_IDX(idx + 1, idy, idz)].x;
+    yr = (idy == NG - 1) ? gridPotential[modIndex(idx, idy + 1, idz)].x
+                         : gridPotential[GRID_IDX(idx, idy + 1, idz)].x;
+    zr = (idz == NG - 1) ? gridPotential[modIndex(idx, idy, idz + 1)].x
+                         : gridPotential[GRID_IDX(idx, idy, idz + 1)].x;
+
+    gridField[GRID_IDX(idx, idy, idz)].x = -0.5f * (xr - xl);
+    gridField[GRID_IDX(idx, idy, idz)].y = -0.5f * (yr - yl);
+    gridField[GRID_IDX(idx, idy, idz)].z = -0.5f * (zr - zl);
 #endif
-  }
-}
-
-__global__ void findFieldInCells2(Vec3* gridField, cufftComplex* gridPotential) {
-  for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < CELLS_CNT;
-       idx += gridDim.x * blockDim.x) {
-    int x = idx % NG;
-    int y = (idx / NG) % NG;
-    int z = idx / (NG * NG);
-
-    gridField[idx] = getFieldInCell(x, y, z, gridPotential);
   }
 }
 
@@ -224,32 +194,26 @@ __device__ Vec3 interpolateField(Vec3* gridField, Vec3 position) {
   float ty = 1 - dy;
   float tz = 1 - dz;
 
-  float resX = tx * ty * tz * gridField[GRID_IDX(xi, yi, zi)].x +
-               dx * ty * tz * gridField[GRID_IDX(xi + 1, yi, zi)].x +
-               tx * dy * tz * gridField[GRID_IDX(xi, yi + 1, zi)].x +
-               tx * ty * dz * gridField[GRID_IDX(xi, yi, zi + 1)].x +
-               dx * dy * tz * gridField[GRID_IDX(xi + 1, yi + 1, zi)].x +
-               dx * ty * dz * gridField[GRID_IDX(xi + 1, yi, zi + 1)].x +
-               tx * dy * dz * gridField[GRID_IDX(xi, yi + 1, zi + 1)].x +
-               dx * dy * dz * gridField[GRID_IDX(xi + 1, yi + 1, zi + 1)].x;
+  auto field000 = gridField[GRID_IDX(xi, yi, zi)];
+  auto field100 = gridField[GRID_IDX(xi + 1, yi, zi)];
+  auto field010 = gridField[GRID_IDX(xi, yi + 1, zi)];
+  auto field001 = gridField[GRID_IDX(xi, yi, zi + 1)];
+  auto field110 = gridField[GRID_IDX(xi + 1, yi + 1, zi)];
+  auto field101 = gridField[GRID_IDX(xi + 1, yi, zi + 1)];
+  auto field011 = gridField[GRID_IDX(xi, yi + 1, zi + 1)];
+  auto field111 = gridField[GRID_IDX(xi + 1, yi + 1, zi + 1)];
 
-  float resY = tx * ty * tz * gridField[GRID_IDX(xi, yi, zi)].y +
-               dx * ty * tz * gridField[GRID_IDX(xi + 1, yi, zi)].y +
-               tx * dy * tz * gridField[GRID_IDX(xi, yi + 1, zi)].y +
-               tx * ty * dz * gridField[GRID_IDX(xi, yi, zi + 1)].y +
-               dx * dy * tz * gridField[GRID_IDX(xi + 1, yi + 1, zi)].y +
-               dx * ty * dz * gridField[GRID_IDX(xi + 1, yi, zi + 1)].y +
-               tx * dy * dz * gridField[GRID_IDX(xi, yi + 1, zi + 1)].y +
-               dx * dy * dz * gridField[GRID_IDX(xi + 1, yi + 1, zi + 1)].y;
+  float resX = tx * ty * tz * field000.x + dx * ty * tz * field100.x + tx * dy * tz * field010.x +
+               tx * ty * dz * field001.x + dx * dy * tz * field110.x + dx * ty * dz * field101.x +
+               tx * dy * dz * field011.x + dx * dy * dz * field111.x;
 
-  float resZ = tx * ty * tz * gridField[GRID_IDX(xi, yi, zi)].z +
-               dx * ty * tz * gridField[GRID_IDX(xi + 1, yi, zi)].z +
-               tx * dy * tz * gridField[GRID_IDX(xi, yi + 1, zi)].z +
-               tx * ty * dz * gridField[GRID_IDX(xi, yi, zi + 1)].z +
-               dx * dy * tz * gridField[GRID_IDX(xi + 1, yi + 1, zi)].z +
-               dx * ty * dz * gridField[GRID_IDX(xi + 1, yi, zi + 1)].z +
-               tx * dy * dz * gridField[GRID_IDX(xi, yi + 1, zi + 1)].z +
-               dx * dy * dz * gridField[GRID_IDX(xi + 1, yi + 1, zi + 1)].z;
+  float resY = tx * ty * tz * field000.y + dx * ty * tz * field100.y + tx * dy * tz * field010.y +
+               tx * ty * dz * field001.y + dx * dy * tz * field110.y + dx * ty * dz * field101.y +
+               tx * dy * dz * field011.y + dx * dy * dz * field111.y;
+
+  float resZ = tx * ty * tz * field000.z + dx * ty * tz * field100.z + tx * dy * tz * field010.z +
+               tx * ty * dz * field001.z + dx * dy * tz * field110.z + dx * ty * dz * field101.z +
+               tx * dy * dz * field011.z + dx * dy * dz * field111.z;
 
   return Vec3(resX, resY, resZ);
 }
@@ -257,16 +221,14 @@ __device__ Vec3 interpolateField(Vec3* gridField, Vec3 position) {
 __global__ void updateAccelerations(Vec3* accelerations,
                                     Vec3* positions,
                                     Vec3* gridField,
+                                    SphRadDecrFieldParams bulgeParams,
+                                    float G,
                                     float H,
                                     float DT) {
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < N; idx += blockDim.x * gridDim.x) {
     Vec3 intField = interpolateField(gridField, positions[idx]);
-    Vec3 galaxyCenter(30, 30, 30);  // copy-paste from main
-    float rb = 3.0f;
-    float mb = 15.0f;
-    float G = 4.5e-3f;
     Vec3 extField = accelerationToCodeUnits(
-        externalFieldBulge(positionToOrigUnits(positions[idx], H), galaxyCenter, rb, mb, G), H, DT);
+        sphRadDecrField(positionToOrigUnits(positions[idx], H), bulgeParams, G), H, DT);
 
     accelerations[idx].x = intField.x + extField.x;
     accelerations[idx].y = intField.y + extField.y;
@@ -282,25 +244,6 @@ __global__ void updateVelocities(Vec3* velocities, Vec3* accelerations) {
   }
 }
 
-float reassignDensityMs = 0;
-float forwardFFTMs = 0;
-float findFourierPotentialMs = 0;
-float inverseFFTMs = 0;
-float scaleAfterInverseMs = 0;
-float findFieldInCellsMs = 0;
-float updateAccelerationsMs = 0;
-
-cudaEvent_t reassignDensityStart, reassignDensityStop;
-cudaEvent_t forwardFFTStart, forwardFFTStop;
-cudaEvent_t findFourierPotentialStart, findFourierPotentialStop;
-cudaEvent_t inverseFFTStart, inverseFFTStop;
-cudaEvent_t scaleAfterInverseStart, scaleAfterInverseStop;
-cudaEvent_t findFieldInCellsStart, findFieldInCellsStop;
-cudaEvent_t updateAccelerationsStart, updateAccelerationsStop;
-
-dim3 block;
-dim3 grid;
-
 void pmMethodStep(Vec3* d_accelerations,
                   cufftComplex* d_gridDensity,
                   cufftComplex* d_gridDensityFourier,
@@ -309,6 +252,7 @@ void pmMethodStep(Vec3* d_accelerations,
                   Vec3* d_gridField,
                   Vec3* d_positions,
                   float* d_masses,
+                  SphRadDecrFieldParams bulgeParams,
                   float H,
                   float DT,
                   float G) {
@@ -330,11 +274,10 @@ void pmMethodStep(Vec3* d_accelerations,
   scaleAfterInverse<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(d_gridPotential);
 
   cudaTime(findFieldInCells, findFieldInCells<<<grid, block>>>(d_gridField, d_gridPotential));
-  // findFieldInCells2<<<dim3(NUM_BLOCKS(CELLS_CNT)), dim3(BLOCK_SIZE)>>>(d_gridField,
-  //                                                                      d_gridPotential);
 
-  cudaTime(updateAccelerations, updateAccelerations<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(
-                                    d_accelerations, d_positions, d_gridField, H, DT));
+  cudaTime(updateAccelerations,
+           updateAccelerations<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_accelerations, d_positions,
+                                                              d_gridField, bulgeParams, G, H, DT));
 
   cudaEventSynchronize(reassignDensityStop);
   cudaEventSynchronize(forwardFFTStop);
@@ -343,7 +286,7 @@ void pmMethodStep(Vec3* d_accelerations,
   cudaEventSynchronize(findFieldInCellsStop);
   cudaEventSynchronize(updateAccelerationsStop);
 
-  float milliseconds = 0;
+  float milliseconds;
   cudaAccTime(milliseconds, reassignDensity);
   cudaAccTime(milliseconds, forwardFFT);
   cudaAccTime(milliseconds, findFourierPotential);
@@ -364,13 +307,8 @@ __global__ void updatePositions(Vec3* positions, Vec3* velocities) {
   }
 }
 
-long long pmTimeMs = 0;
-long long memcpyTimeMs = 0;
-long long boundsCheckTimeMs = 0;
-long long recordStateTimeMs = 0;
-
-long long toMs(const std::chrono::nanoseconds delta) {
-  return std::chrono::duration_cast<std::chrono::milliseconds>(delta).count();
+inline float toMs(const std::chrono::nanoseconds delta) {
+  return delta.count() * 1e-6f;
 }
 
 void pmMethod(std::vector<Vec3>& state,
@@ -378,11 +316,12 @@ void pmMethod(std::vector<Vec3>& state,
               float effectiveBoxSize,
               float H,
               float DT,
+              SphRadDecrFieldParams bulgeParams,
               float G,
               int simLength) {
-  block.x = blockSizeX;
-  block.y = blockSizeY;
-  block.z = blockSizeZ;
+  block.x = BLOCK_SIZE_X;
+  block.y = BLOCK_SIZE_Y;
+  block.z = BLOCK_SIZE_Z;
   grid.x = (64 + block.x - 1) / block.x;
   grid.y = (64 + block.y - 1) / block.y;
   grid.z = (64 + block.z - 1) / block.z;
@@ -439,7 +378,7 @@ void pmMethod(std::vector<Vec3>& state,
   stateToCodeUnits<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities, H, DT, N);
 
   pmMethodStep(d_accelerations, d_gridDensity, d_gridDensityFourier, d_gridPotential,
-               d_gridPotentialFourier, d_gridField, d_positions, d_masses, H, DT, G);
+               d_gridPotentialFourier, d_gridField, d_positions, d_masses, bulgeParams, H, DT, G);
 
   setHalfVelocities<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_velocities, d_accelerations);
 
@@ -469,9 +408,9 @@ void pmMethod(std::vector<Vec3>& state,
 
     stateToCodeUnits<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities, H, DT, N);
 
-    hostTime(pm,
-             pmMethodStep(d_accelerations, d_gridDensity, d_gridDensityFourier, d_gridPotential,
-                          d_gridPotentialFourier, d_gridField, d_positions, d_masses, H, DT, G));
+    hostTime(pm, pmMethodStep(d_accelerations, d_gridDensity, d_gridDensityFourier, d_gridPotential,
+                              d_gridPotentialFourier, d_gridField, d_positions, d_masses,
+                              bulgeParams, H, DT, G));
     updateVelocities<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_velocities, d_accelerations);
   }
   cudaDeviceSynchronize();

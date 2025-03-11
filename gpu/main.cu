@@ -1,8 +1,8 @@
 #include "common.h"
 #include "disk_sampler_linear.cuh"
+#include "external_fields.cuh"
 #include "pm.cuh"
 #include "state_recorder.cuh"
-#include "utils.cuh"
 #include "vec3.cuh"
 
 int main() {
@@ -20,8 +20,9 @@ int main() {
   float DT = 1;
 
   DiskSamplerLinear sampler;
-  std::vector<Vec3> state = sampler.sample(galaxyCenter, rb, mb, rd, md, thickness, G, N);
+  SphRadDecrFieldParams bulgeParams(galaxyCenter, rb, mb);
+  std::vector<Vec3> state = sampler.sample(bulgeParams, rd, md, thickness, G, N);
   std::vector<float> masses(N, md / N);
 
-  pmMethod(state, masses, effectiveBoxSize, H, DT, G, simLength);
+  pmMethod(state, masses, effectiveBoxSize, H, DT, bulgeParams, G, simLength);
 }

@@ -1,6 +1,7 @@
 #include "diskSampler.h"
 #include <cmath>
 #include <numbers>
+#include "externalFields.h"
 #include "utils.h"
 
 Vec3 DiskSampler::getVelocity(Vec3 pos,
@@ -25,13 +26,13 @@ Vec3 DiskSampler::getVelocity(Vec3 pos,
   float E = std::comp_ellint_2(k);
   float Pi = std::comp_ellint_3(n, k);
 
-  float density = md / (std::numbers::pi * rd * rd);
+  float density = md / (std::numbers::pi_v<float> * rd * rd);
   float term1 = -(1 + ra * ra) / (ra * (1 + ra)) * K;
   float term2 = (1 + ra) * (2 + ra) / (2 * ra) * E;
   float term3 = -(1 - ra) * (1 - ra) / (2 * (1 + ra)) * Pi;
   float gdVal = 2 * G * density * (term1 + term2 + term3);
 
-  Vec3 gb = externalFieldBulge(pos, center, rb, mb, G);
+  Vec3 gb = sphRadDecrField(pos, center, rb, mb, G);
   Vec3 gd = gdVal * rVecxy / rVecxy.getMagnitude();
   Vec3 g = gb + gd;
   float gVal = g.getMagnitude();
@@ -54,8 +55,8 @@ std::vector<Vec3> DiskSampler::sample(Vec3 center,
   std::vector<Vec3> state(2 * n);
 
   for (int i = 0; i < n; ++i) {
-    float phi = u(re) * 2 * std::numbers::pi;
-    float r = 0.97 * rd * std::sqrt(u(re));
+    float phi = u(re) * 2 * std::numbers::pi_v<float>;
+    float r = 0.97f * rd * std::sqrtf(u(re));
 
     float x = r * std::cos(phi);
     float y = r * std::sin(phi);

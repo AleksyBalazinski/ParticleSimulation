@@ -1,13 +1,14 @@
 #pragma once
 
 #include <random>
+#include "external_fields.cuh"
 #include "vec3.cuh"
 
 class DiskSamplerLinear {
  private:
   std::default_random_engine re;
 
-  Vec3 getVelocity(Vec3 pos, Vec3 center, float rb, float mb, float rd, float md, float G);
+  Vec3 getVelocity(Vec3 pos, SphRadDecrFieldParams bulgeParams, float rd, float md, float G);
 
   float sampleFromLinear(float rd);
 
@@ -20,6 +21,10 @@ class DiskSamplerLinear {
  public:
   DiskSamplerLinear();
 
-  std::vector<Vec3>
-  sample(Vec3 center, float rb, float mb, float rd, float md, float thickness, float G, int n);
+  std::vector<Vec3> sample(SphRadDecrFieldParams bulgeParams,
+                           float rd,
+                           float md,
+                           float thickness,
+                           float G,
+                           int n);
 };

@@ -13,14 +13,21 @@ void StateRecorder::saveIfLimitHit(std::ofstream& of, std::string& str, int& cou
 StateRecorder::StateRecorder(const char* positionsPath,
                              const char* energyPath,
                              const char* momentumPath,
+                             const char* expectedMomentumPath,
                              int maxRecords)
     : positionsPath(positionsPath),
       energyPath(energyPath),
       momentumPath(momentumPath),
+      expectedMomentumPath(expectedMomentumPath),
       maxRecords(maxRecords),
       positionsFile(positionsPath, std::ofstream::trunc),
       energyFile(energyPath, std::ofstream::trunc),
-      momentumFile(momentumPath, std::ofstream::trunc) {}
+      momentumFile(momentumPath, std::ofstream::trunc),
+      expectedMomentumFile(expectedMomentumPath, std::ofstream::trunc),
+      vecBuf(new char[vecBufSize]),
+      singleBuf(new char[singleBufSize]) {
+  positionsStr.reserve(30 * maxRecords);
+}
 
 StateRecorder::~StateRecorder() {
   positionsFile.close();
@@ -31,11 +38,21 @@ StateRecorder::~StateRecorder() {
 void StateRecorder::recordPositions(std::vector<Vec3>::iterator begin,
                                     std::vector<Vec3>::iterator end) {
   for (auto it = begin; it != end; ++it) {
-    positionsStr += it->toString() + '\n';
+    positionsStr += it->toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize) + '\n';
   }
   positionsStr += "\n\n";
   ++positionsRecordsCnt;
   saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
+}
+
+void StateRecorder::recordPositions(const std::vector<Particle>& particles) {
+  for (const auto& p : particles) {
+    positionsStr += p.position.toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
+    positionsStr += '\n';
+    ++positionsRecordsCnt;
+    saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
+  }
+  positionsStr += "\n\n";
 }
 
 void StateRecorder::recordEnergy(float pe, float ke) {
@@ -46,16 +63,25 @@ void StateRecorder::recordEnergy(float pe, float ke) {
 }
 
 void StateRecorder::recordTotalMomentum(Vec3 momentum) {
-  momentumStr += momentum.toString();
+  momentumStr += momentum.toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
   momentumStr += '\n';
   ++momentumRecordsCnt;
   saveIfLimitHit(momentumFile, momentumStr, momentumRecordsCnt);
+}
+
+void StateRecorder::recordExpectedMomentum(Vec3 expectedMomentum) {
+  expectedMomentumStr +=
+      expectedMomentum.toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
+  expectedMomentumStr += '\n';
+  ++expectedMomentumRecordsCnt;
+  saveIfLimitHit(expectedMomentumFile, expectedMomentumStr, expectedMomentumRecordsCnt);
 }
 
 std::string StateRecorder::flush() {
   positionsFile << positionsStr;
   energyFile << energyStr;
   momentumFile << momentumStr;
+  expectedMomentumFile << expectedMomentumStr;
 
   std::filesystem::path cwd = std::filesystem::current_path();
   return cwd.string();

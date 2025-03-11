@@ -30,11 +30,11 @@ void nBody(StateType& x, StateType& dxdt, float t, const std::vector<float>& mas
   }
 }
 
-void setIntegerVelocities(const std::vector<Vec3>& state,
-                          const std::vector<float>& masses,
-                          float G,
-                          float h,
-                          std::vector<Vec3>& intVs) {
+void setIntegerStepVelocities(const std::vector<Vec3>& state,
+                              const std::vector<float>& masses,
+                              float G,
+                              float h,
+                              std::vector<Vec3>& intVs) {
   int n = (int)intVs.size();
   for (int i = 0; i < n; i++) {
     intVs[i] = state[n + i] + 0.5f * h * acceleration(i, state, masses, G);
@@ -50,7 +50,7 @@ std::string ppMethod(std::vector<Vec3>& state,
                      const char* energyPath,
                      const char* momentumPath) {
   const int n = (int)masses.size();
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath);
+  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, "");
 #ifdef LEAPFROG
   // set v_(1/2)
   // from this point on state[n + i] holds velocities at half-step
@@ -73,18 +73,20 @@ std::string ppMethod(std::vector<Vec3>& state,
 #endif
 
 #ifdef LEAPFROG
-    setIntegerVelocities(state, masses, G, stepSize, velocities);
+    setIntegerStepVelocities(state, masses, G, stepSize, velocities);
     stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
                                kineticEnergy(velocities.begin(), velocities.end(), masses, G));
 #endif
-    stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
-                               kineticEnergy(state.begin() + n, state.end(), masses, G));
+    stateRecorder.recordEnergy(
+        SimInfo::potentialEnergy(state.begin(), state.begin() + n, masses, G),
+        SimInfo::kineticEnergy(state.begin() + n, state.end(), masses, G));
     stateRecorder.recordPositions(state.begin(), state.begin() + n);
 
 #ifdef LEAPFROG
     stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
 #endif
-    stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
+    stateRecorder.recordTotalMomentum(
+        SimInfo::totalMomentum(state.begin() + n, state.end(), masses));
 
 #ifdef LEAPFROG
     for (int i = 0; i < n; i++) {
