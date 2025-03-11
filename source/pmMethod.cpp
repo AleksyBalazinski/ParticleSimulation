@@ -107,11 +107,24 @@ Vec3 PMMethod::totalExternalForceOrigUnits() {
   return f;
 }
 
+float TSCAssignmentFunc(float x, int t) {
+  if (t == 1) {
+    return 0.5f * (0.5f + x) * (0.5f + x);
+  }
+  if (t == 0) {
+    return 0.75f - x * x;
+  }
+  if (t == -1) {
+    return 0.5f * (0.5f - x) * (0.5f - x);
+  }
+  return 0;
+}
+
 void PMMethod::spreadMass() {
   grid.clearDensity();
 
   switch (is) {
-    case InterpolationScheme::NGP:
+    case InterpolationScheme::NGP: {
       std::for_each(std::execution::par, particles.begin(), particles.end(),
                     [this](const Particle& p) {
                       int x = (int)std::round(p.position.x);
@@ -122,8 +135,9 @@ void PMMethod::spreadMass() {
                       grid.assignDensity(x, y, z, densityToCodeUnits(p.mass / vol, DT, G));
                     });
       return;
+    }
 
-    case InterpolationScheme::CIC:
+    case InterpolationScheme::CIC: {
       std::for_each(std::execution::par, particles.begin(), particles.end(),
                     [this](const Particle& p) {
                       int x = (int)p.position.x;
@@ -153,6 +167,38 @@ void PMMethod::spreadMass() {
                     });
 
       return;
+    }
+
+    case InterpolationScheme::TSC: {
+      std::for_each(std::execution::par, particles.begin(), particles.end(),
+                    [this](const Particle& p) {
+                      int x = (int)p.position.x;
+                      int y = (int)p.position.y;
+                      int z = (int)p.position.z;
+
+                      float vol = H * H * H;
+                      float d = densityToCodeUnits(p.mass / vol, DT, G);
+
+                      float dx = p.position.x - x;
+                      float dy = p.position.y - y;
+                      float dz = p.position.z - z;
+
+                      for (int t1 = -1; t1 <= 1; ++t1) {
+                        float T1 = (d / 8) * 2 * TSCAssignmentFunc(dx, t1);
+                        for (int t2 = -1; t2 <= 1; ++t2) {
+                          float T2 = T1 * 2 * TSCAssignmentFunc(dy, t2);
+                          for (int t3 = -1; t3 <= 1; ++t3) {
+                            float T3 = T2 * 2 * TSCAssignmentFunc(dz, t3);
+                            grid.assignDensity(x + t1, y + t2, z + t3, T3);
+                          }
+                        }
+                      }
+                    });
+      return;
+    }
+
+    default:
+      throw std::invalid_argument("Unkown interpolation scheme");
   }
 }
 
@@ -187,6 +233,29 @@ Vec3 PMMethod::interpolateField(Vec3 position) {
              dx * ty * dz * grid.getField(xi + 1, yi, zi + 1) +
              tx * dy * dz * grid.getField(xi, yi + 1, zi + 1) +
              dx * dy * dz * grid.getField(xi + 1, yi + 1, zi + 1);
+    }
+
+    case InterpolationScheme::TSC: {
+      int xi = (int)x;
+      int yi = (int)y;
+      int zi = (int)z;
+      float dx = x - xi;
+      float dy = y - yi;
+      float dz = z - zi;
+
+      Vec3 interpolatedField;
+      for (int t1 = -1; t1 <= 1; ++t1) {
+        float T1 = 2 * TSCAssignmentFunc(dx, t1);
+        for (int t2 = -1; t2 <= 1; ++t2) {
+          float T2 = T1 * 2 * TSCAssignmentFunc(dy, t2);
+          for (int t3 = -1; t3 <= 1; ++t3) {
+            float T3 = T2 * 2 * TSCAssignmentFunc(dz, t3);
+            interpolatedField += 0.125f * T3 * grid.getField(xi + t1, yi + t2, zi + t3);
+          }
+        }
+      }
+
+      return interpolatedField;
     }
 
     default:

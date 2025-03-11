@@ -7,7 +7,7 @@
 #include "stateRecorder.h"
 #include "vec3.h"
 
-enum class InterpolationScheme { NGP, CIC };
+enum class InterpolationScheme { NGP, CIC, TSC };
 enum class FiniteDiffScheme { TWO_POINT, FOUR_POINT };
 
 class PMMethod {
