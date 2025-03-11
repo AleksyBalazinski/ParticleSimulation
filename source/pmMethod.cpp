@@ -1,6 +1,5 @@
 #include "pmMethod.h"
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <complex>
 #include <execution>
@@ -9,6 +8,7 @@
 #include <ranges>
 #include <stdexcept>
 #include "grid.h"
+#include "measureTime.h"
 #include "simInfo.h"
 #include "stateRecorder.h"
 #include "unitConversions.h"
@@ -47,9 +47,7 @@ void PMMethod::findFourierPotential() {
   auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
   std::for_each(std::execution::par_unseq, gridRange.begin(), gridRange.end(),
                 [dim, this](int idx) {
-                  int kx = idx % dim;
-                  int ky = (idx / dim) % dim;
-                  int kz = idx / (dim * dim);
+                  auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
                   if (kx == 0 && ky == 0 && kz == 0) {
                     return;
                   }
@@ -84,13 +82,21 @@ void PMMethod::updateAccelerations() {
   });
 }
 
+declareTimeAcc(spreadMass);
+declareTimeAcc(forwardFFT);
+declareTimeAcc(fourierPotential);
+declareTimeAcc(inverseFFT);
+declareTimeAcc(fieldInCells);
+declareTimeAcc(updateAccelerations);
+declareTimeAcc(recordPositions);
+
 void PMMethod::pmMethodStep() {
-  spreadMass();
-  grid.fftDensity();
-  findFourierPotential();
-  grid.invFftPotential();
-  findFieldInCells();
-  updateAccelerations();
+  measureTime(spreadMass, spreadMass());
+  measureTime(forwardFFT, grid.fftDensity());
+  measureTime(fourierPotential, findFourierPotential());
+  measureTime(inverseFFT, grid.invFftPotential());
+  measureTime(fieldInCells, findFieldInCells());
+  measureTime(updateAccelerations, updateAccelerations());
 }
 
 bool PMMethod::escapedComputationalBox() {
@@ -341,7 +347,7 @@ std::string PMMethod::run(const int simLength,
 
     stateToOriginalUnits(particles, H, DT);
 
-    stateRecorder.recordPositions(particles);
+    measureTime(recordPositions, stateRecorder.recordPositions(particles));
     if (collectDiagnostics) {
       auto expectedMomentum = simInfo.updateExpectedMomentum(totalExternalForceOrigUnits(), DT);
       stateRecorder.recordExpectedMomentum(expectedMomentum);
@@ -364,5 +370,14 @@ std::string PMMethod::run(const int simLength,
 
     updateVelocities();
   }
+
+  printTime(spreadMass);
+  printTime(forwardFFT);
+  printTime(fourierPotential);
+  printTime(inverseFFT);
+  printTime(fieldInCells);
+  printTime(updateAccelerations);
+  printTime(recordPositions);
+
   return stateRecorder.flush();
 }

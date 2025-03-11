@@ -43,7 +43,7 @@ int main() {
   float DT = 1;
 
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
-              InterpolationScheme::CIC, FiniteDiffScheme::TWO_POINT, grid);
+              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, grid);
 
   pm.run(200, true /*diagnostics*/);
 }
