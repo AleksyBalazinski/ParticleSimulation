@@ -9,6 +9,8 @@ Vec3 velocityToCodeUntits(const Vec3& v, float H, float DT);
 
 Vec3 accelerationToCodeUnits(const Vec3& a, float H, float DT);
 
+Vec3 accelerationToOriginalUnits(const Vec3& a, float H, float DT);
+
 float densityToCodeUnits(float density, float DT, float G);
 
 float densityToOriginalUnits(float density, float DT, float G);

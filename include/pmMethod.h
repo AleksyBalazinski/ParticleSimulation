@@ -63,8 +63,10 @@ class PMMethod {
 
   std::string run(const int simLength,
                   bool collectDiagnostics = false,
+                  bool recordField = false,
                   const char* positionsPath = "output.txt",
                   const char* energyPath = "energy.txt",
                   const char* momentumPath = "momentum.txt",
-                  const char* expectedMomentumPath = "expected_momentum.txt");
+                  const char* expectedMomentumPath = "expected_momentum.txt",
+                  const char* fieldPath = "field.txt");
 };

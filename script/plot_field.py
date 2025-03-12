@@ -13,7 +13,17 @@ def update_limits(position):
         if position[i] < pos_min[i]:
             pos_min[i] = position[i]
 
-def load_data(filename):
+def get_smoothed_g(rs, a):
+    gs = []
+    for r in rs:
+        if r <= a:
+            gs.append(-4.5e-3 / a**2 * (8*r/a - 9 * r**2 / a**2 + 2*r**4 / a**4) )
+        else:
+            gs.append(-4.5e-3 / r**2)
+
+    return gs
+
+def load_data(filename, up_limits = False):
     frames = []
     with open(filename, 'r') as f:
         block = []
@@ -21,7 +31,8 @@ def load_data(filename):
             if line.strip():
                 position = list(map(float, line.split()))
                 block.append(position)
-                update_limits(position)
+                if up_limits:
+                    update_limits(position)
             elif block:  # Blank line after a block
                 frames.append(np.array(block))
                 block = []
@@ -31,39 +42,36 @@ def load_data(filename):
     return frames
 
 frames = load_data(sys.argv[1])
+field = load_data(sys.argv[2])
 
 last_frame = frames[-1]
 x = last_frame[:, 0]
-y = last_frame[:, 1]
-z = last_frame[:, 2]
+print(min(x))
+print(max(x))
+
+last_field = field[-1]
+g_x = last_field[:, 0]
+g_y = last_field[:, 1]
+g_z = last_field[:, 2]
+
+r = (x - 30)
+expected_g_x = -4.5e-3 * 1/r**2
+
+a = 3.5
+smoothed_g_x = get_smoothed_g(r, a)
 
 fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.set_xlim(0, 60)
-ax.set_ylim(0, 60)
-# ax.set_zlim([pos_min[2], pos_max[2]])
-ax.set_zlim(0, 60)
+ax = fig.add_subplot(111)
+ax.set_xlim(min(x), max(x))
+ax.set_ylim(-0.001, 0)
+
 
 ax.set_xlabel('x (kpc)')
-ax.set_ylabel('y (kpc)')
-ax.set_zlabel('z (kpc)')
+ax.set_ylabel('field value')
 
-ax.scatter(x, y, z, s=0.1)
-plt.show()
+ax.plot(x, g_x, label='PM g')
+ax.plot(x[5:], expected_g_x[5:], label='expected g')
+ax.plot(x, smoothed_g_x, label='smoothed g')
+ax.legend()
 
-plt.figure(figsize=(8, 8))
-plt.scatter(x, y, c='blue', marker='o', alpha=0.5, s=0.1)
-plt.xlim(0, 60)
-plt.ylim(0, 60)
-plt.xlabel('x (kpc)')
-plt.ylabel('y (kpc)')
-plt.grid(True) 
-plt.show()
-
-plt.scatter(x, z, c='blue', marker='o', alpha=0.5, s=0.1)
-plt.xlim(0, 60)
-plt.ylim(0, 60)
-plt.xlabel('x (kpc)')
-plt.ylabel('z (kpc)')
-plt.grid(True) 
 plt.show()

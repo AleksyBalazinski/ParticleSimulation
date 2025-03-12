@@ -50,7 +50,7 @@ std::string ppMethod(std::vector<Vec3>& state,
                      const char* energyPath,
                      const char* momentumPath) {
   const int n = (int)masses.size();
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, "");
+  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, "", "");
 #ifdef LEAPFROG
   // set v_(1/2)
   // from this point on state[n + i] holds velocities at half-step

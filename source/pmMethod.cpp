@@ -297,7 +297,7 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
 
 void PMMethod::setHalfVelocities() {
   std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
-                [this](Particle& p) { p.velocity += 0.5 * p.acceleration; });
+                [this](Particle& p) { p.velocity += 0.5f * p.acceleration; });
 }
 
 void PMMethod::setIntegerStepVelocities() {
@@ -318,11 +318,14 @@ void PMMethod::updatePositions() {
 
 std::string PMMethod::run(const int simLength,
                           bool collectDiagnostics,
+                          bool recordField,
                           const char* positionsPath,
                           const char* energyPath,
                           const char* momentumPath,
-                          const char* expectedMomentumPath) {
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath);
+                          const char* expectedMomentumPath,
+                          const char* fieldPath) {
+  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath,
+                              fieldPath);
   SimInfo simInfo;
 
   if (collectDiagnostics) {
@@ -355,6 +358,9 @@ std::string PMMethod::run(const int simLength,
       auto pe = SimInfo::potentialEnergy(grid, particles, externalPotential, H, DT, G);
       auto ke = SimInfo::kineticEnergy(particles);
       stateRecorder.recordEnergy(pe, ke);
+    }
+    if (recordField) {
+      stateRecorder.recordField(particles, H, DT);
     }
     if (escapedComputationalBox()) {
       std::cout << "Particle moved outside the computational box.\n";

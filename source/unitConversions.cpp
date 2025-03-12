@@ -16,6 +16,10 @@ Vec3 accelerationToCodeUnits(const Vec3& a, float H, float DT) {
   return DT * DT * a / H;
 }
 
+Vec3 accelerationToOriginalUnits(const Vec3& a, float H, float DT) {
+  return H * a / (DT * DT);
+}
+
 float densityToCodeUnits(float density, float DT, float G) {
   return DT * DT * 4 * std::numbers::pi_v<float> * G * density;
 }
