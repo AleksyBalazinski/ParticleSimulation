@@ -140,11 +140,11 @@ void galaxySimulationP3M() {
 
 void smallSimPP() {
   const int n = 3;
-  std::vector<float> masses(n, 1.0f);
-  std::vector<Vec3> state = std::vector<Vec3>({
-      Vec3(25, 29.5f, 30), Vec3(35, 30.5f, 30), Vec3(30, 35, 30),  // positions
-      Vec3(0.1f, 0, 0), Vec3(-0.1f, 0, 0), Vec3(0, -0.11f, 0)      // velocities
-  });
+  std::vector<float> masses = {20, 5, 1e2};
+  std::vector<Vec3> state = {
+      Vec3(30, 30, 30), Vec3(45, 32, 30),  Vec3(30, 10, 30),  // positions
+      Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3()             // velocities
+  };
 
   int simLength = 100;
   float DT = 1;
@@ -154,14 +154,14 @@ void smallSimPP() {
 }
 
 void smallSimP3M() {
-  const int n = 2;
-  std::vector<float> masses(n, 1.0f);
-  std::vector<Vec3> state = std::vector<Vec3>({
-      Vec3(27, 29.5, 30), Vec3(33, 30.5, 30),  // positions
-      Vec3(0.2f, 0, 0), Vec3(-0.2f, 0, 0)      // velocities
-  });
+  const int n = 3;
+  std::vector<float> masses = {20, 5, 1e2};
+  std::vector<Vec3> state = {
+      Vec3(30, 30, 30), Vec3(45, 32, 30),  Vec3(30, 10, 30),  // positions
+      Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3()             // velocities
+  };
 
-  int simLength = 50;
+  int simLength = 100;
   float G = 4.5e-3f;
 
   int gridPoints = 64;
@@ -178,7 +178,7 @@ void smallSimP3M() {
               InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL,
               grid);
 
-  float a = 4.0f;
+  float a = 7.5f;
   float re = 0.7f * a;
   P3MMethod p3m(pm, effectiveBoxSize, re, a, H);
   p3m.run(simLength, true, false, "output-p3m.txt");
@@ -187,8 +187,8 @@ void smallSimP3M() {
 
 int main() {
   // smallSimPP();
-  // smallSimP3M();
-  probeField();
-  // galaxySimulationP3M();
-  // galaxySimulationPM();
+  smallSimP3M();
+  //   probeField();
+  //   galaxySimulationP3M();
+  //   galaxySimulationPM();
 }

@@ -9,25 +9,19 @@
 P3MMethod::P3MMethod(PMMethod& pmMethod,
                      float compBoxSize,
                      float cutoffRadius,
-                     float particleRadius,
-                     float H)
+                     float particleDiameter,
+                     float H,
+                     bool useSRForceTable)
     : pmMethod(pmMethod),
       chainingMesh(compBoxSize, cutoffRadius, H),
       cutoffRadius(lengthToCodeUnits(cutoffRadius, pmMethod.getH())),
-      particleRadius(lengthToCodeUnits(particleRadius, H)) {
+      particleDiameter(lengthToCodeUnits(particleDiameter, H)),
+      useSRForceTable(useSRForceTable) {
   this->tabulatedValuesCnt = 500;
   float re = this->cutoffRadius;
   this->deltaSquared = re * re / (this->tabulatedValuesCnt - 1);
-  for (int i = 0; i < this->tabulatedValuesCnt; ++i) {
-    float rSquared = i * this->deltaSquared;
-    float r = std::sqrtf(rSquared);
-    float R = -referenceForce(r, this->particleRadius);
-
-    float G = 1 / (4 * std::numbers::pi_v<float>);
-    float eps = 0.05f;
-    float totalForce = -G / (r * r + eps * eps);
-
-    FTable.push_back(r == 0 ? 0 : totalForce / r);
+  if (useSRForceTable) {
+    initSRForceTable();
   }
 }
 
@@ -48,42 +42,7 @@ void P3MMethod::calculateShortRangeForces(std::vector<Particle>& particles) {
       for (auto node = chainingMesh.getParticlesInCell(q); node != nullptr; node = node->next) {
         for (auto nodeN = chainingMesh.getParticlesInCell(qn); nodeN != nullptr;
              nodeN = nodeN->next) {
-          int i = node->particleId;
-          int j = nodeN->particleId;
-          if (i == j) {
-            continue;
-          }
-          Vec3 rij = particles[i].position - particles[j].position;
-          if (rij.getMagnitudeSquared() >= cutoffRadius * cutoffRadius) {
-            continue;
-          }
-
-          float rijLength = rij.getMagnitude();
-          Vec3 rijDir = rij / rijLength;
-          float mi = particles[i].mass;
-          float mj = particles[j].mass;
-          float G = 1 / (4 * std::numbers::pi_v<float>);
-
-          Vec3 Rij = -mi * mj * referenceForce(rijLength, particleRadius) * rijDir;
-          float eps = 0.05f;
-          Vec3 totalForceij = -G * mi * mj / (rijLength * rijLength + eps * eps) * rijDir;
-          Vec3 shortRangeij = totalForceij - Rij;
-
-          particles[i].shortRangeForce += shortRangeij;
-          if (qn != q) {
-            particles[j].shortRangeForce += -1 * shortRangeij;
-          }
-
-          // float ksi = rij.getMagnitudeSquared() / deltaSquared;
-          // int t = int(ksi);
-          // assert(t < tabulatedValuesCnt - 1);
-          // float mi = particles[i].mass;
-          // float mj = particles[j].mass;
-          // float F = mi * mj * (FTable[t] + (ksi - t) * (FTable[t + 1] - FTable[t]));
-          // particles[i].shortRangeForce += F * rij;
-          // if (qn != q) {
-          //   particles[j].shortRangeForce += -F * rij;
-          // }
+          updateShortRangeFoces(node->particleId, nodeN->particleId, q, qn, particles);
         }
       }
     }
@@ -118,6 +77,7 @@ void P3MMethod::run(const int simLength,
   stateToCodeUnits(particles, H, DT);
   massToCodeUnits(particles, H, DT, G);
 
+  pmMethod.initGreensFunction();
   pmMethod.pmMethodStep();
   calculateShortRangeForces(particles);
   correctAccelerations(particles);
@@ -175,11 +135,77 @@ void P3MMethod::run(const int simLength,
   stateRecorder.flush();
 }
 
-float P3MMethod::referenceForce(float r, float a) {
+float P3MMethod::referenceForceS1(float r, float a) {
   float G = 1 / (4 * std::numbers::pi_v<float>);
-  float eps = 0.05f;
+  float eps = 0.01f;
   if (r >= a) {
     return G / (r * r + eps * eps);
   }
   return G / (a * a) * (8 * r / a - 9 * r * r / (a * a) + 2 * std::powf(r / a, 4));
+}
+
+Vec3 P3MMethod::shortRangeForce(Vec3 rij, float mi, float mj, float a) {
+  float rijLength = rij.getMagnitude();
+  Vec3 rijDir = rij / rijLength;
+  float G = 1 / (4 * std::numbers::pi_v<float>);
+
+  Vec3 Rij = -mi * mj * referenceForceS1(rijLength, particleDiameter) * rijDir;
+  float eps = 0.01f;
+  Vec3 totalForceij = -G * mi * mj / (rijLength * rijLength + eps * eps) * rijDir;
+  return totalForceij - Rij;
+}
+
+Vec3 P3MMethod::shortRangeForceFromTable(Vec3 rij, float mi, float mj, float a) {
+  float ksi = rij.getMagnitudeSquared() / deltaSquared;
+  int t = int(ksi);
+  assert(t < tabulatedValuesCnt - 1);
+  float F = mi * mj * (FTable[t] + (ksi - t) * (FTable[t + 1] - FTable[t]));
+  return F * rij;
+}
+
+void P3MMethod::updateShortRangeFoces(int i,
+                                      int j,
+                                      int q,
+                                      int qn,
+                                      std::vector<Particle>& particles) {
+  if (i == j) {
+    return;
+  }
+
+  Vec3 rij = particles[i].position - particles[j].position;
+  if (rij.getMagnitudeSquared() >= cutoffRadius * cutoffRadius) {
+    return;
+  }
+
+  if (!useSRForceTable) {
+    Vec3 shortRangeij =
+        shortRangeForce(rij, particles[i].mass, particles[j].mass, particleDiameter);
+
+    particles[i].shortRangeForce += shortRangeij;
+    if (qn != q) {
+      particles[j].shortRangeForce += -1 * shortRangeij;
+    }
+  } else {
+    Vec3 shortRangeij =
+        shortRangeForceFromTable(rij, particles[i].mass, particles[j].mass, particleDiameter);
+
+    particles[i].shortRangeForce += shortRangeij;
+    if (qn != q) {
+      particles[j].shortRangeForce += -1 * shortRangeij;
+    }
+  }
+}
+
+void P3MMethod::initSRForceTable() {  // TODO: add S2 reference force
+  for (int i = 0; i < tabulatedValuesCnt; ++i) {
+    float rSquared = i * deltaSquared;
+    float r = std::sqrtf(rSquared);
+    float R = -referenceForceS1(r, particleDiameter);
+
+    float G = 1 / (4 * std::numbers::pi_v<float>);
+    float eps = 0.01f;
+    float totalForce = -G / (r * r + eps * eps);
+
+    FTable.push_back(r == 0 ? 0 : totalForce / r);
+  }
 }

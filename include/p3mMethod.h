@@ -10,17 +10,19 @@ class P3MMethod {
   ChainingMesh chainingMesh;
   SimInfo simInfo;
   float cutoffRadius;
-  float particleRadius;
+  float particleDiameter;
   int tabulatedValuesCnt;
   float deltaSquared;
   std::vector<float> FTable;
+  bool useSRForceTable;
 
  public:
   P3MMethod(PMMethod& pmMethod,
             float compBoxSize,
             float cutoffRadius,
-            float particleRadius,
-            float H);
+            float particleDiameter,
+            float H,
+            bool useSRForceTable = true);
 
   void calculateShortRangeForces(std::vector<Particle>& particles);
 
@@ -34,5 +36,13 @@ class P3MMethod {
            const char* fieldPath = "field.txt");
 
  private:
-  float referenceForce(float r, float a);
+  float referenceForceS1(float r, float a);
+
+  Vec3 shortRangeForce(Vec3 rij, float mi, float mj, float a);
+
+  Vec3 shortRangeForceFromTable(Vec3 rij, float mi, float mj, float a);
+
+  void updateShortRangeFoces(int i, int j, int q, int qn, std::vector<Particle>& particles);
+
+  void initSRForceTable();
 };

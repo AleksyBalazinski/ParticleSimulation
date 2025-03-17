@@ -44,15 +44,15 @@ char* Vec3::toString(char* singleBuf,
                      char* vecBuf,
                      std::size_t vecBufSize) const {
   std::memset(vecBuf, 0, vecBufSize);
-  int cnt1 = std::snprintf(singleBuf, singleBufSize, "%f", x);
+  int cnt1 = std::snprintf(singleBuf, singleBufSize, "%.6e", x);
   std::memcpy(vecBuf, singleBuf, cnt1);
   vecBuf[cnt1] = ' ';
 
-  int cnt2 = std::snprintf(singleBuf, singleBufSize, "%f", y);
+  int cnt2 = std::snprintf(singleBuf, singleBufSize, "%.6e", y);
   std::memcpy(vecBuf + cnt1 + 1, singleBuf, cnt2);
   vecBuf[cnt1 + 1 + cnt2] = ' ';
 
-  int cnt3 = std::snprintf(singleBuf, singleBufSize, "%f", z);
+  int cnt3 = std::snprintf(singleBuf, singleBufSize, "%.6e", z);
   std::memcpy(vecBuf + cnt1 + cnt2 + 2, singleBuf, cnt3);
 
   return vecBuf;

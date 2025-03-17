@@ -33,9 +33,7 @@ class PMMethod {
 
   void updateAccelerations();
 
-  void initGreensFunction();
-
- public:
+  public:
   PMMethod(const std::vector<Vec3>& state,
            const std::vector<float>& masses,
            const float effectiveBoxSize,
@@ -70,4 +68,6 @@ class PMMethod {
   bool escapedComputationalBox();
 
   Vec3 totalExternalForceOrigUnits();
+
+  void initGreensFunction();
 };
