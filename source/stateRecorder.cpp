@@ -42,7 +42,8 @@ StateRecorder::~StateRecorder() {
 void StateRecorder::recordPositions(std::vector<Vec3>::iterator begin,
                                     std::vector<Vec3>::iterator end) {
   for (auto it = begin; it != end; ++it) {
-    positionsStr += it->toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize) + '\n';
+    positionsStr += it->toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
+    positionsStr += '\n';
   }
   positionsStr += "\n\n";
   ++positionsRecordsCnt;

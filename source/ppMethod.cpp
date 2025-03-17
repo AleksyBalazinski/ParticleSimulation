@@ -13,8 +13,9 @@ Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<float>& m
     if (j == i)
       continue;
 
-    auto rij = r[i] - r[j];
-    acc += -1.0f * G * masses[j] / std::powf((rij.getMagnitude()), 3) * rij;
+    Vec3 rij = r[i] - r[j];
+    float eps = 0.01f;
+    acc += -1.0f * G * masses[j] / std::powf(rij.getMagnitudeSquared() + eps * eps, 1.5f) * rij;
   }
 
   return acc;

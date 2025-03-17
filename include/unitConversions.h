@@ -36,3 +36,13 @@ void integerStepVelocitiesToOriginalUnits(std::vector<Particle>& particles, floa
 void integerStepVelocitiesToCodeUnits(std::vector<Particle>& particles, float H, float DT);
 
 float potentialToOriginalUnits(float potential, float H, float DT);
+
+float massToCodeUnits(float m, float H, float DT, float G);
+
+float massToOriginalUnits(float m, float H, float DT, float G);
+
+void massToCodeUnits(std::vector<Particle>& particles, float H, float DT, float G);
+
+void massToOriginalUnits(std::vector<Particle>& particles, float H, float DT, float G);
+
+float lengthToCodeUnits(float x, float H);

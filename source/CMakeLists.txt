@@ -12,6 +12,9 @@
 	diskSamplerLinear.cpp
 	particle.cpp
 	externalFields.cpp
+	leapfrog.cpp
+	chainingMesh.cpp
+	p3mMethod.cpp
 )
 
 target_include_directories(ParticleSimulation

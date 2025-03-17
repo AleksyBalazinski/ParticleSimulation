@@ -5,6 +5,7 @@ import sys
 
 pos_max = [-math.inf] * 3
 pos_min = [math.inf] * 3
+m = 1
 
 def update_limits(position):
     for i in range(3):
@@ -17,9 +18,9 @@ def get_smoothed_g(rs, a):
     gs = []
     for r in rs:
         if r <= a:
-            gs.append(-4.5e-3 / a**2 * (8*r/a - 9 * r**2 / a**2 + 2*r**4 / a**4) )
+            gs.append(-4.5e-3 *m/ a**2 * (8*r/a - 9 * r**2 / a**2 + 2*r**4 / a**4) )
         else:
-            gs.append(-4.5e-3 / r**2)
+            gs.append(-4.5e-3 *m/ r**2)
 
     return gs
 
@@ -55,15 +56,15 @@ g_y = last_field[:, 1]
 g_z = last_field[:, 2]
 
 r = (x - 30)
-expected_g_x = -4.5e-3 * 1/r**2
+expected_g_x = -4.5e-3 * m/r**2
 
-a = 3.5
+a = 7.5
 smoothed_g_x = get_smoothed_g(r, a)
 
 fig = plt.figure()
 ax = fig.add_subplot(111)
 ax.set_xlim(min(x), max(x))
-ax.set_ylim(-0.001, 0)
+ax.set_ylim(-0.01, 0)
 
 
 ax.set_xlabel('x (kpc)')
@@ -71,7 +72,7 @@ ax.set_ylabel('field value')
 
 ax.plot(x, g_x, label='PM g')
 ax.plot(x[5:], expected_g_x[5:], label='expected g')
-ax.plot(x, smoothed_g_x, label='smoothed g')
+ax.plot(x, smoothed_g_x, label='smoothed g', linestyle="--")
 ax.legend()
 
 plt.show()

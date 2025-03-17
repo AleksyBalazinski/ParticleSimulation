@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
 
 def load_data(filename):
     frames = []
@@ -18,8 +19,8 @@ def load_data(filename):
     return frames
 
 if __name__ == "__main__":
-    frames1 = load_data('output1.txt')
-    frames2 = load_data('output2.txt')
+    frames1 = load_data(sys.argv[1])
+    frames2 = load_data(sys.argv[2])
 
     if len(frames1) != len(frames2):
         raise ValueError("The files don't have equal length")
