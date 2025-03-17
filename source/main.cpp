@@ -188,7 +188,7 @@ void smallSimP3M() {
 int main() {
   // smallSimPP();
   // smallSimP3M();
-  // probeField();
+  probeField();
   // galaxySimulationP3M();
-  galaxySimulationPM();
+  // galaxySimulationPM();
 }

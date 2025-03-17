@@ -4,12 +4,9 @@
 #include <vector>
 #include "grid.h"
 #include "particle.h"
+#include "pmConfig.h"
 #include "stateRecorder.h"
 #include "vec3.h"
-
-enum class InterpolationScheme { NGP, CIC, TSC };
-enum class FiniteDiffScheme { TWO_POINT, FOUR_POINT };
-enum class GreensFunction { DISCRETE_LAPLACIAN, S1_OPTIMAL };
 
 class PMMethod {
  private:
@@ -35,6 +32,8 @@ class PMMethod {
   void findFieldInCells();
 
   void updateAccelerations();
+
+  void initGreensFunction();
 
  public:
   PMMethod(const std::vector<Vec3>& state,

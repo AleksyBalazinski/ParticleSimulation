@@ -24,6 +24,7 @@ class Grid {
   std::vector<std::complex<float>> densityFourier;
   std::vector<std::complex<float>> potential;
   std::vector<std::complex<float>> potentialFourier;
+  std::vector<std::complex<float>> greensFunction;
 
   FFTAdapter<float>& fftAdapter;
 
@@ -55,4 +56,8 @@ class Grid {
   std::complex<float> getDensityFourier(int i, int j, int k) const;
 
   float getPotential(int i, int j, int k) const;
+
+  std::complex<float> getGreensFunction(int i, int j, int k) const;
+
+  void setGreensFunction(int i, int j, int k, std::complex<float> value);
 };

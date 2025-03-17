@@ -19,6 +19,7 @@ Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
       densityFourier(length),
       potential(length),
       potentialFourier(length),
+      greensFunction(length),
       fftAdapter(fftAdapter) {
   std::memset(density.data(), 0, length * sizeof(std::complex<float>));
 }
@@ -70,4 +71,12 @@ std::complex<float> Grid::getDensityFourier(int i, int j, int k) const {
 
 float Grid::getPotential(int i, int j, int k) const {
   return potential[getWrappedIndx(i, j, k, gridPoints)].real();
+}
+
+std::complex<float> Grid::getGreensFunction(int i, int j, int k) const {
+  return greensFunction[getIndx(i, j, k)];
+}
+
+void Grid::setGreensFunction(int i, int j, int k, std::complex<float> value) {
+  greensFunction[getIndx(i, j, k)] = value;
 }

@@ -8,6 +8,7 @@
 #include <numbers>
 #include <ranges>
 #include <stdexcept>
+#include "greensFunctions.h"
 #include "grid.h"
 #include "leapfrog.h"
 #include "measureTime.h"
@@ -43,130 +44,15 @@ Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, Grid& grid) {
   return Vec3(fieldX, fieldY, fieldZ);
 }
 
-float sinc(float x) {
-  if (x == 0) {
-    return 1;
-  }
-  return std::sinf(x) / x;
-}
-
-float TSCFourier(std::array<float, 3> k) {
-  float prod = 1;
-  for (int i = 0; i < 3; i++) {
-    prod *= std::powf(sinc(k[i] / 2), 3);
-  }
-
-  return prod;
-}
-
-float S1Fourier(float k, float a) {
-  float u = k * a / 2;
-  return -3 / std::powf(u, 3) * (u * std::cosf(u) - std::sinf(u));
-}
-
-float S2Fourier(float k, float a) {
-  float u = k * a / 2;
-  return 12 / std::powf(u, 4) * (2 - std::cosf(u) - u * std::sinf(u));
-}
-
-std::array<std::complex<float>, 3> RFourier(std::array<float, 3> k, float a) {
-  std::array<std::complex<float>, 3> R;
-  std::complex<float> I(0, 1);
-  float kLength = std::sqrtf(k[0] * k[0] + k[1] * k[1] + k[2] * k[2]);
-  float sSquared = std::powf(S1Fourier(kLength, a), 2);
-  for (int i = 0; i < 3; i++) {
-    R[i] = -I * float(k[i]) * sSquared / (kLength * kLength);
-  }
-
-  return R;
-}
-
-std::array<std::complex<float>, 3> DFourier(std::array<float, 3> k) {
-  std::array<std::complex<float>, 3> D;
-  std::complex<float> I(0, 1);
-  for (int i = 0; i < 3; i++) {
-    D[i] = I * std::sinf(k[i]);
-  }
-
-  return D;
-}
-
-std::complex<float> dotProduct(std::array<std::complex<float>, 3> a,
-                               std::array<std::complex<float>, 3> b) {
-  std::complex<float> dot(0, 0);
-  for (int i = 0; i < 3; i++) {
-    std::complex<float> biConj(b[i].real(), -1 * b[i].imag());
-    dot += a[i] * biConj;
-  }
-
-  return dot;
-}
-
 void PMMethod::findFourierPotential() {
   int dim = grid.getGridPoints();
   grid.setPotentialFourier(0, 0, 0, std::complex<float>(0, 0));
   auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
   std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dim, this](int idx) {
     auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
-    if (kx == 0 && ky == 0 && kz == 0) {
-      return;
-    }
-
-    std::complex<float> G;
-    const float pi = std::numbers::pi_v<float>;
-    if (gFunc == GreensFunction::DISCRETE_LAPLACIAN) {
-      auto sx = std::sinf(pi * kx / dim);
-      auto sy = std::sinf(pi * ky / dim);
-      auto sz = std::sinf(pi * kz / dim);
-      G = -0.25f / (sx * sx + sy * sy + sz * sz);
-    } else if (gFunc == GreensFunction::S1_OPTIMAL) {
-      std::array<float, 3> k = {2 * pi * float(kx) / dim, 2 * pi * float(ky) / dim,
-                                2 * pi * float(kz) / dim};
-      float denomSum = 1;
-      for (int i = 0; i < 3; i++) {
-        denomSum *=
-            (1 - std::powf(std::sinf(k[i] / 2), 2) + 2.0f / 15 * std::powf(std::sinf(k[i] / 2), 4));
-      }
-
-      std::array<std::complex<float>, 3> D;
-      std::complex<float> I(0, 1);
-      if (fds == FiniteDiffScheme::TWO_POINT) {
-        D = DFourier(k);
-      } else {  // TODO implement four-point
-        throw std::invalid_argument("not implemented");
-      }
-
-      float DNormSquared = 0;
-      for (int i = 0; i < 3; i++) {
-        std::complex<float> DiConj(D[i].real(), -1 * D[i].imag());
-        DNormSquared += (D[i] * DiConj).real();
-      }
-
-      int limit = 2;
-      std::array<std::complex<float>, 3> numDotRight = {0, 0, 0};
-      for (int n1 = -limit; n1 <= limit; n1++) {
-        for (int n2 = -limit; n2 <= limit; n2++) {
-          for (int n3 = -limit; n3 <= limit; n3++) {
-            std::array<float, 3> kn = {k[0] + 2 * pi * n1, k[1] + 2 * pi * n2, k[2] + 2 * pi * n3};
-            float uSquared = std::powf(TSCFourier(kn), 2);
-
-            float a = lengthToCodeUnits(7.5, H);  // TODO
-            std::array<std::complex<float>, 3> R = RFourier(kn, a);
-            numDotRight[0] += uSquared * R[0];
-            numDotRight[1] += uSquared * R[1];
-            numDotRight[2] += uSquared * R[2];
-          }
-        }
-      }
-
-      std::complex<float> numerator = dotProduct(D, numDotRight);
-      float denominator = DNormSquared * denomSum;
-
-      G = numerator / denominator;
-    }
 
     auto densityFourier = grid.getDensityFourier(kx, ky, kz);
-    auto potentialFourier = densityFourier * G;
+    auto potentialFourier = densityFourier * grid.getGreensFunction(kx, ky, kz);
     grid.setPotentialFourier(kx, ky, kz, potentialFourier);
   });
 }
@@ -187,6 +73,26 @@ void PMMethod::updateAccelerations() {
     p.acceleration =
         interpolateField(p.position) +
         accelerationToCodeUnits(externalField(positionToOriginalUnits(p.position, H)), H, DT);
+  });
+}
+
+void PMMethod::initGreensFunction() {
+  int dim = grid.getGridPoints();
+  auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
+  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dim, this](int idx) {
+    auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
+
+    std::complex<float> G;
+    if (gFunc == GreensFunction::DISCRETE_LAPLACIAN) {
+      G = GreenDiscreteLaplacian(kx, ky, kz, dim);
+    } else if (gFunc == GreensFunction::S1_OPTIMAL) {
+      // TODO: remove hard-coded value
+      G = GreenS1OptimalTSC(kx, ky, kz, dim, lengthToCodeUnits(7.5f, H), fds);
+    } else {
+      throw std::invalid_argument("not implemented");
+    }
+
+    grid.setGreensFunction(kx, ky, kz, G);
   });
 }
 
@@ -420,6 +326,7 @@ std::string PMMethod::run(const int simLength,
 
   stateToCodeUnits(particles, H, DT);
   massToCodeUnits(particles, H, DT, G);
+  initGreensFunction();
   pmMethodStep();
 
   setHalfStepVelocities(particles);

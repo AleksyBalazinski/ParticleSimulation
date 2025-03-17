@@ -15,6 +15,7 @@
 	leapfrog.cpp
 	chainingMesh.cpp
 	p3mMethod.cpp
+	greensFunctions.cpp
 )
 
 target_include_directories(ParticleSimulation
