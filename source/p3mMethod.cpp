@@ -177,22 +177,17 @@ void P3MMethod::updateShortRangeFoces(int i,
     return;
   }
 
+  Vec3 shortRangeij;
   if (!useSRForceTable) {
-    Vec3 shortRangeij =
-        shortRangeForce(rij, particles[i].mass, particles[j].mass, particleDiameter);
-
-    particles[i].shortRangeForce += shortRangeij;
-    if (qn != q) {
-      particles[j].shortRangeForce += -1 * shortRangeij;
-    }
+    shortRangeij = shortRangeForce(rij, particles[i].mass, particles[j].mass, particleDiameter);
   } else {
-    Vec3 shortRangeij =
+    shortRangeij =
         shortRangeForceFromTable(rij, particles[i].mass, particles[j].mass, particleDiameter);
+  }
 
-    particles[i].shortRangeForce += shortRangeij;
-    if (qn != q) {
-      particles[j].shortRangeForce += -1 * shortRangeij;
-    }
+  particles[i].shortRangeForce += shortRangeij;
+  if (qn != q) {
+    particles[j].shortRangeForce += -1 * shortRangeij;
   }
 }
 

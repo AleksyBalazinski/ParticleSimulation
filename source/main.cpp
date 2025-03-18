@@ -133,9 +133,11 @@ void galaxySimulationP3M() {
               InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL,
               grid);
 
-  P3MMethod p3m(pm, effectiveBoxSize, 3.5f, 4.0f, H);
+  float a = 4 * H;
+  float re = 0.7f * a;
+  P3MMethod p3m(pm, effectiveBoxSize, re, a, H);
 
-  p3m.run(50, false /*diagnostics*/);
+  p3m.run(20, false /*diagnostics*/);
 }
 
 void smallSimPP() {
@@ -187,8 +189,8 @@ void smallSimP3M() {
 
 int main() {
   // smallSimPP();
-  smallSimP3M();
+  // smallSimP3M();
   //   probeField();
-  //   galaxySimulationP3M();
+  galaxySimulationP3M();
   //   galaxySimulationPM();
 }
