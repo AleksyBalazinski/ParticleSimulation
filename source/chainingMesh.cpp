@@ -26,6 +26,31 @@ void ChainingMesh::fill(const std::vector<Particle>& particles) {
   }
 }
 
+void ChainingMesh::fillWithYSorting(const std::vector<Particle>& particles) {
+  std::memset(hoc.data(), 0, size * sizeof(LLNode*));
+
+  for (int i = 0; i < particles.size(); ++i) {
+    const auto& p = particles[i];
+    int cellX = int(p.position.x / HC);
+    int cellY = int(p.position.y / HC);
+    int cellZ = int(p.position.z / HC);
+
+    int cellIdx = tripleToFlatIndex(cellX, cellY, cellZ);
+    LLNode* head = hoc[cellIdx];
+    if (head == nullptr || particles[head->particleId].position.y > p.position.y) {
+      hoc[cellIdx] = new LLNode(i, head);
+      continue;
+    }
+
+    for (LLNode* node = head; node != nullptr; node = node->next) {
+      if (node->next == nullptr || particles[node->next->particleId].position.y > p.position.y) {
+        node->next = new LLNode(i, node->next);
+        break;
+      }
+    }
+  }
+}
+
 void ChainingMesh::clear() {
   for (int i = 0; i < size; ++i) {
     for (LLNode* node = hoc[i]; node != nullptr;) {
@@ -36,7 +61,7 @@ void ChainingMesh::clear() {
   }
 }
 
-std::array<int, 14> ChainingMesh::getNeighborsAndSelf(int cellIdx) {
+std::array<int, 14> ChainingMesh::getNeighborsAndSelf(int cellIdx) const {
   auto [cellX, cellY, cellZ] = flatToTripleIndex(cellIdx);
   std::array<int, 14> neighbors;
 
@@ -59,22 +84,22 @@ ChainingMesh::LLNode* ChainingMesh::getParticlesInCell(int cellIdx) {
   return hoc[cellIdx];
 }
 
-int ChainingMesh::getSize() {
+int ChainingMesh::getSize() const {
   return size;
 }
 
-int ChainingMesh::getLength() {
+int ChainingMesh::getLength() const {
   return M;
 }
 
-int ChainingMesh::tripleToFlatIndex(int x, int y, int z) {
+int ChainingMesh::tripleToFlatIndex(int x, int y, int z) const {
   if (x < 0 || y < 0 || z < 0 || x >= M || y >= M || z >= M) {
     return -1;
   }
   return x + y * M + z * M * M;
 }
 
-std::tuple<int, int, int> ChainingMesh::flatToTripleIndex(int idx) {
+std::tuple<int, int, int> ChainingMesh::flatToTripleIndex(int idx) const {
   return std::make_tuple(idx % M, (idx / M) % M, idx / (M * M));
 }
 

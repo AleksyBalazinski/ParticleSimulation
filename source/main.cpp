@@ -101,7 +101,7 @@ void galaxySimulationP3M() {
     [L] = kpc
     [T] = Myr
     */
-  const int n = int(1e4);
+  const int n = int(5e4);
   Vec3 galaxyCenter = Vec3(30, 30, 30);
   float rb = 3.0f;
   float mb = 15.0f;
@@ -133,11 +133,11 @@ void galaxySimulationP3M() {
               InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL,
               grid);
 
-  float a = 4 * H;
+  float a = 3 * H;
   float re = 0.7f * a;
   P3MMethod p3m(pm, effectiveBoxSize, re, a, H);
 
-  p3m.run(20, false /*diagnostics*/);
+  p3m.run(20, true /*diagnostics*/);
 }
 
 void smallSimPP() {

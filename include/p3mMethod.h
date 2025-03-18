@@ -24,8 +24,6 @@ class P3MMethod {
             float H,
             bool useSRForceTable = true);
 
-  void calculateShortRangeForces(std::vector<Particle>& particles);
-
   void run(const int simLength,
            bool collectDiagnostics = false,
            bool recordField = false,
@@ -36,6 +34,10 @@ class P3MMethod {
            const char* fieldPath = "field.txt");
 
  private:
+  void calculateShortRangeForces(std::vector<Particle>& particles);
+
+  void calculateShortRangeForcesPar(std::vector<Particle>& particles);
+
   float referenceForceS1(float r, float a);
 
   Vec3 shortRangeForce(Vec3 rij, float mi, float mj, float a);
@@ -44,5 +46,14 @@ class P3MMethod {
 
   void updateShortRangeFoces(int i, int j, int q, int qn, std::vector<Particle>& particles);
 
+  void updateSRForcesThreadSafe(int i,
+                                int j,
+                                int q,
+                                int qn,
+                                int qnLocal,
+                                std::vector<Particle>& particles);
+
   void initSRForceTable();
+
+  void updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Particle>& particles);
 };

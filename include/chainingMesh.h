@@ -28,18 +28,20 @@ class ChainingMesh {
 
   void fill(const std::vector<Particle>& particles);
 
+  void fillWithYSorting(const std::vector<Particle>& particles);
+
   void clear();
 
-  std::array<int, 14> getNeighborsAndSelf(int cellIdx);
+  std::array<int, 14> getNeighborsAndSelf(int cellIdx) const;
 
   LLNode* getParticlesInCell(int cellIdx);
 
-  int getSize();
+  int getSize() const;
 
-  int getLength();
+  int getLength() const;
 
  private:
-  int tripleToFlatIndex(int x, int y, int z);
+  int tripleToFlatIndex(int x, int y, int z) const;
 
-  std::tuple<int, int, int> flatToTripleIndex(int idx);
+  std::tuple<int, int, int> flatToTripleIndex(int idx) const;
 };
