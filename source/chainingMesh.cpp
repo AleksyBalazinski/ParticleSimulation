@@ -8,21 +8,6 @@ ChainingMesh::ChainingMesh(float compBoxSize, float cutoffRadius, float H, int N
       hoc(size, nullptr),
       nodePool(new LLNode[N]) {}
 
-void ChainingMesh::fill(const std::vector<Particle>& particles) {
-  std::memset(hoc.data(), 0, size * sizeof(LLNode*));
-
-  for (int i = 0; i < particles.size(); ++i) {
-    const auto& p = particles[i];
-    int cellX = int(p.position.x / HC);
-    int cellY = int(p.position.y / HC);
-    int cellZ = int(p.position.z / HC);
-
-    int cellIdx = tripleToFlatIndex(cellX, cellY, cellZ);
-    LLNode* head = hoc[cellIdx];
-    hoc[cellIdx] = new LLNode(i, head);
-  }
-}
-
 void ChainingMesh::fillWithYSorting(const std::vector<Particle>& particles) {
   std::memset(hoc.data(), 0, size * sizeof(LLNode*));
 

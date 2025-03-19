@@ -102,7 +102,7 @@ void galaxySimulationP3M() {
     [L] = kpc
     [T] = Myr
     */
-  const int n = int(3e4);
+  const int n = int(4e4);
   Vec3 galaxyCenter = Vec3(30, 30, 30);
   float rb = 3.0f;
   float mb = 15.0f;
@@ -139,7 +139,7 @@ void galaxySimulationP3M() {
   float softeningLength = 1.5f;
   P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S1);
 
-  p3m.run(150, true /*diagnostics*/);
+  p3m.run(200, true /*diagnostics*/);
 }
 
 void smallSimPP() {
