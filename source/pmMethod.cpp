@@ -1,5 +1,6 @@
 #include "pmMethod.h"
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <complex>
 #include <execution>
@@ -7,7 +8,9 @@
 #include <numbers>
 #include <ranges>
 #include <stdexcept>
+#include "greensFunctions.h"
 #include "grid.h"
+#include "leapfrog.h"
 #include "measureTime.h"
 #include "simInfo.h"
 #include "stateRecorder.h"
@@ -45,22 +48,13 @@ void PMMethod::findFourierPotential() {
   int dim = grid.getGridPoints();
   grid.setPotentialFourier(0, 0, 0, std::complex<float>(0, 0));
   auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
-  std::for_each(std::execution::par_unseq, gridRange.begin(), gridRange.end(),
-                [dim, this](int idx) {
-                  auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
-                  if (kx == 0 && ky == 0 && kz == 0) {
-                    return;
-                  }
-                  auto sx = std::sinf(std::numbers::pi_v<float> * kx / dim);
-                  auto sy = std::sinf(std::numbers::pi_v<float> * ky / dim);
-                  auto sz = std::sinf(std::numbers::pi_v<float> * kz / dim);
-                  auto G = -0.25f / (sx * sx + sy * sy + sz * sz);
+  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dim, this](int idx) {
+    auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
 
-                  auto densityFourier = grid.getDensityFourier(kx, ky, kz);
-                  auto potentialFourier =
-                      std::complex<float>(G * densityFourier.real(), G * densityFourier.imag());
-                  grid.setPotentialFourier(kx, ky, kz, potentialFourier);
-                });
+    auto densityFourier = grid.getDensityFourier(kx, ky, kz);
+    auto potentialFourier = densityFourier * grid.getGreensFunction(kx, ky, kz);
+    grid.setPotentialFourier(kx, ky, kz, potentialFourier);
+  });
 }
 
 void PMMethod::findFieldInCells() {
@@ -79,6 +73,35 @@ void PMMethod::updateAccelerations() {
     p.acceleration =
         interpolateField(p.position) +
         accelerationToCodeUnits(externalField(positionToOriginalUnits(p.position, H)), H, DT);
+  });
+}
+
+void PMMethod::initGreensFunction() {
+  int dim = grid.getGridPoints();
+  auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
+  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dim, this](int idx) {
+    auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
+
+    std::complex<float> G;
+    if (gFunc == GreensFunction::DISCRETE_LAPLACIAN) {
+      G = GreenDiscreteLaplacian(kx, ky, kz, dim);
+    } else if (gFunc == GreensFunction::S1_OPTIMAL) {
+      if (is == InterpolationScheme::TSC) {
+        G = GreenOptimalTSC(kx, ky, kz, dim, particleDiameter, CloudShape::S1, fds);
+      } else {
+        throw std::invalid_argument("not implemented");
+      }
+    } else if (gFunc == GreensFunction::S2_OPTIMAL) {
+      if (is == InterpolationScheme::TSC) {
+        G = GreenOptimalTSC(kx, ky, kz, dim, particleDiameter, CloudShape::S2, fds);
+      } else {
+        throw std::invalid_argument("not implemented");
+      }
+    } else {
+      throw std::invalid_argument("not implemented");
+    }
+
+    grid.setGreensFunction(kx, ky, kz, G);
   });
 }
 
@@ -137,8 +160,7 @@ void PMMethod::spreadMass() {
                       int y = (int)std::round(p.position.y);
                       int z = (int)std::round(p.position.z);
 
-                      float vol = H * H * H;
-                      grid.assignDensity(x, y, z, densityToCodeUnits(p.mass / vol, DT, G));
+                      grid.assignDensity(x, y, z, p.mass);
                     });
       return;
     }
@@ -150,8 +172,7 @@ void PMMethod::spreadMass() {
                       int y = (int)p.position.y;
                       int z = (int)p.position.z;
 
-                      float vol = H * H * H;
-                      float d = densityToCodeUnits(p.mass / vol, DT, G);
+                      float d = p.mass;  // divided by vol = H * H * H = 1 (code units)
 
                       float dx = p.position.x - x;
                       float dy = p.position.y - y;
@@ -182,8 +203,7 @@ void PMMethod::spreadMass() {
                       int y = (int)p.position.y;
                       int z = (int)p.position.z;
 
-                      float vol = H * H * H;
-                      float d = densityToCodeUnits(p.mass / vol, DT, G);
+                      float d = p.mass;
 
                       float dx = p.position.x - x;
                       float dy = p.position.y - y;
@@ -279,6 +299,8 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
                    const float G,
                    const InterpolationScheme is,
                    const FiniteDiffScheme fds,
+                   const GreensFunction gFunc,
+                   const float particleDiameter,
                    Grid& grid)
     : effectiveBoxSize(effectiveBoxSize),
       externalField(externalField),
@@ -288,6 +310,8 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
       G(G),
       is(is),
       fds(fds),
+      gFunc(gFunc),
+      particleDiameter(lengthToCodeUnits(particleDiameter, H)),
       grid(grid) {
   this->N = static_cast<int>(masses.size());
   for (int i = 0; i < N; ++i) {
@@ -295,34 +319,16 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
   }
 }
 
-void PMMethod::setHalfVelocities() {
-  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
-                [this](Particle& p) { p.velocity += 0.5 * p.acceleration; });
-}
-
-void PMMethod::setIntegerStepVelocities() {
-  std::for_each(std::execution::par, particles.begin(), particles.end(), [this](Particle& p) {
-    p.integerStepVelocity = p.velocity + 0.5f * p.acceleration;
-  });
-}
-
-void PMMethod::updateVelocities() {
-  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
-                [this](Particle& p) { p.velocity += p.acceleration; });
-}
-
-void PMMethod::updatePositions() {
-  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
-                [this](Particle& p) { p.position += p.velocity; });
-}
-
 std::string PMMethod::run(const int simLength,
                           bool collectDiagnostics,
+                          bool recordField,
                           const char* positionsPath,
                           const char* energyPath,
                           const char* momentumPath,
-                          const char* expectedMomentumPath) {
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath);
+                          const char* expectedMomentumPath,
+                          const char* fieldPath) {
+  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath,
+                              fieldPath);
   SimInfo simInfo;
 
   if (collectDiagnostics) {
@@ -330,18 +336,20 @@ std::string PMMethod::run(const int simLength,
   }
 
   stateToCodeUnits(particles, H, DT);
+  massToCodeUnits(particles, H, DT, G);
+  initGreensFunction();
   pmMethodStep();
 
-  setHalfVelocities();
+  setHalfStepVelocities(particles);
 
   for (int t = 0; t <= simLength; ++t) {
     std::cout << "progress: " << float(t) / simLength << '\r';
     std::cout.flush();
 
-    updatePositions();
+    updatePositions(particles);
 
     if (collectDiagnostics) {
-      setIntegerStepVelocities();
+      setIntegerStepVelocities(particles);
       integerStepVelocitiesToOriginalUnits(particles, H, DT);
     }
 
@@ -349,12 +357,16 @@ std::string PMMethod::run(const int simLength,
 
     measureTime(recordPositions, stateRecorder.recordPositions(particles));
     if (collectDiagnostics) {
+      massToOriginalUnits(particles, H, DT, G);
       auto expectedMomentum = simInfo.updateExpectedMomentum(totalExternalForceOrigUnits(), DT);
       stateRecorder.recordExpectedMomentum(expectedMomentum);
       stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
       auto pe = SimInfo::potentialEnergy(grid, particles, externalPotential, H, DT, G);
       auto ke = SimInfo::kineticEnergy(particles);
       stateRecorder.recordEnergy(pe, ke);
+    }
+    if (recordField) {
+      stateRecorder.recordField(particles, H, DT);
     }
     if (escapedComputationalBox()) {
       std::cout << "Particle moved outside the computational box.\n";
@@ -363,12 +375,13 @@ std::string PMMethod::run(const int simLength,
 
     stateToCodeUnits(particles, H, DT);
     if (collectDiagnostics) {
+      massToCodeUnits(particles, H, DT, G);
       integerStepVelocitiesToCodeUnits(particles, H, DT);
     }
 
     pmMethodStep();
 
-    updateVelocities();
+    updateVelocities(particles);
   }
 
   printTime(spreadMass);
@@ -380,4 +393,28 @@ std::string PMMethod::run(const int simLength,
   printTime(recordPositions);
 
   return stateRecorder.flush();
+}
+
+std::vector<Particle>& PMMethod::getParticles() {
+  return particles;
+}
+
+float PMMethod::getH() const {
+  return H;
+}
+
+float PMMethod::getDT() const {
+  return DT;
+}
+
+float PMMethod::getG() const {
+  return G;
+}
+
+const Grid& PMMethod::getGrid() const {
+  return grid;
+}
+
+std::function<float(Vec3)> PMMethod::getExternalPotential() const {
+  return externalPotential;
 }

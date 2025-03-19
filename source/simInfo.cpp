@@ -25,11 +25,13 @@ float SimInfo::potentialEnergy(std::vector<Vec3>::iterator posBegin,
   const int n = (int)masses.size();
   float potentialEnergy = 0;
   auto posIt = posBegin;
+  float eps = 0.01f;
   for (int i = 0; posIt != posEnd; ++posIt, ++i) {
     auto posIt2 = posIt + 1;
     for (int j = i + 1; posIt2 != posEnd; ++posIt2, ++j) {
       auto rij = *posIt - *posIt2;
-      potentialEnergy += (-1) * G * masses[i] * masses[j] / rij.getMagnitude();
+      potentialEnergy +=
+          (-1) * G * masses[i] * masses[j] / std::powf(rij.getMagnitudeSquared() + eps * eps, 0.5f);
     }
   }
 

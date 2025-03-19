@@ -16,6 +16,10 @@ Vec3 accelerationToCodeUnits(const Vec3& a, float H, float DT) {
   return DT * DT * a / H;
 }
 
+Vec3 accelerationToOriginalUnits(const Vec3& a, float H, float DT) {
+  return H * a / (DT * DT);
+}
+
 float densityToCodeUnits(float density, float DT, float G) {
   return DT * DT * 4 * std::numbers::pi_v<float> * G * density;
 }
@@ -90,4 +94,26 @@ void integerStepVelocitiesToCodeUnits(std::vector<Particle>& particles, float H,
 
 float potentialToOriginalUnits(float potential, float H, float DT) {
   return potential * H * H / (DT * DT);
+}
+
+float massToCodeUnits(float m, float H, float DT, float G) {
+  return DT * DT * 4 * std::numbers::pi_v<float> * G / (H * H * H) * m;
+}
+
+float massToOriginalUnits(float m, float H, float DT, float G) {
+  return (H * H * H) / (DT * DT * 4 * std::numbers::pi_v<float> * G) * m;
+}
+
+void massToCodeUnits(std::vector<Particle>& particles, float H, float DT, float G) {
+  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
+                [H, DT, G](Particle& p) { p.mass = massToCodeUnits(p.mass, H, DT, G); });
+}
+
+void massToOriginalUnits(std::vector<Particle>& particles, float H, float DT, float G) {
+  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(),
+                [H, DT, G](Particle& p) { p.mass = massToOriginalUnits(p.mass, H, DT, G); });
+}
+
+float lengthToCodeUnits(float x, float H) {
+  return x / H;
 }

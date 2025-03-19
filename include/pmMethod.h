@@ -4,11 +4,9 @@
 #include <vector>
 #include "grid.h"
 #include "particle.h"
+#include "pmConfig.h"
 #include "stateRecorder.h"
 #include "vec3.h"
-
-enum class InterpolationScheme { NGP, CIC, TSC };
-enum class FiniteDiffScheme { TWO_POINT, FOUR_POINT };
 
 class PMMethod {
  private:
@@ -23,30 +21,18 @@ class PMMethod {
   float G;
   InterpolationScheme is;
   FiniteDiffScheme fds;
+  GreensFunction gFunc;
+  float particleDiameter;
 
   void spreadMass();
 
   Vec3 interpolateField(Vec3 position);
-
-  void setHalfVelocities();
-
-  void setIntegerStepVelocities();
-
-  void updateVelocities();
-
-  void updatePositions();
-
-  void pmMethodStep();
 
   void findFourierPotential();
 
   void findFieldInCells();
 
   void updateAccelerations();
-
-  bool escapedComputationalBox();
-
-  Vec3 totalExternalForceOrigUnits();
 
  public:
   PMMethod(const std::vector<Vec3>& state,
@@ -59,12 +45,31 @@ class PMMethod {
            const float G,
            const InterpolationScheme is,
            const FiniteDiffScheme fds,
+           const GreensFunction gFunc,
+           const float particleDiameter,
            Grid& grid);
 
   std::string run(const int simLength,
                   bool collectDiagnostics = false,
+                  bool recordField = false,
                   const char* positionsPath = "output.txt",
                   const char* energyPath = "energy.txt",
                   const char* momentumPath = "momentum.txt",
-                  const char* expectedMomentumPath = "expected_momentum.txt");
+                  const char* expectedMomentumPath = "expected_momentum.txt",
+                  const char* fieldPath = "field.txt");
+
+  std::vector<Particle>& getParticles();
+  float getH() const;
+  float getDT() const;
+  float getG() const;
+  const Grid& getGrid() const;
+  std::function<float(Vec3)> getExternalPotential() const;
+
+  void pmMethodStep();
+
+  bool escapedComputationalBox();
+
+  Vec3 totalExternalForceOrigUnits();
+
+  void initGreensFunction();
 };

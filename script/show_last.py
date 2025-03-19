@@ -49,10 +49,7 @@ ax.set_ylabel('y (kpc)')
 ax.set_zlabel('z (kpc)')
 
 ax.scatter(x, y, z, s=0.1)
-
 plt.show()
-
-import matplotlib.pyplot as plt
 
 plt.figure(figsize=(8, 8))
 plt.scatter(x, y, c='blue', marker='o', alpha=0.5, s=0.1)
