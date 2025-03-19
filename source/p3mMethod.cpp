@@ -16,11 +16,13 @@ P3MMethod::P3MMethod(PMMethod& pmMethod,
                      float cutoffRadius,
                      float particleDiameter,
                      float H,
+                     float softeningLength,
                      bool useSRForceTable)
     : pmMethod(pmMethod),
       chainingMesh(compBoxSize, cutoffRadius, H),
       cutoffRadius(lengthToCodeUnits(cutoffRadius, pmMethod.getH())),
       particleDiameter(lengthToCodeUnits(particleDiameter, H)),
+      softeningLength(lengthToCodeUnits(softeningLength, H)),
       useSRForceTable(useSRForceTable) {
   this->tabulatedValuesCnt = 500;
   float re = this->cutoffRadius;
@@ -168,9 +170,8 @@ void P3MMethod::run(const int simLength,
 
 float P3MMethod::referenceForceS1(float r, float a) {
   float G = 1 / (4 * std::numbers::pi_v<float>);
-  float eps = 0.5f;
   if (r >= a) {
-    return G / (r * r + eps * eps);
+    return G / (r * r);
   }
   return G / (a * a) * (8 * r / a - 9 * r * r / (a * a) + 2 * std::powf(r / a, 4));
 }
@@ -181,7 +182,7 @@ Vec3 P3MMethod::shortRangeForce(Vec3 rij, float mi, float mj, float a) {
   float G = 1 / (4 * std::numbers::pi_v<float>);
 
   Vec3 Rij = -mi * mj * referenceForceS1(rijLength, particleDiameter) * rijDir;
-  float eps = 0.5f;
+  float eps = softeningLength;
   Vec3 totalForceij = -G * mi * mj / (rijLength * rijLength + eps * eps) * rijDir;
   return totalForceij - Rij;
 }
@@ -258,7 +259,7 @@ void P3MMethod::initSRForceTable() {  // TODO: add S2 reference force
     float R = -referenceForceS1(r, particleDiameter);
 
     float G = 1 / (4 * std::numbers::pi_v<float>);
-    float eps = 0.5f;
+    float eps = softeningLength;
     float totalForce = -G / (r * r + eps * eps);
 
     FTable.push_back(r == 0 ? 0 : totalForce / std::sqrtf(r * r + eps * eps));

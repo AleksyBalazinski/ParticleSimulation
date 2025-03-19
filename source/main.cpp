@@ -101,7 +101,7 @@ void galaxySimulationP3M() {
     [L] = kpc
     [T] = Myr
     */
-  const int n = int(5e4);
+  const int n = int(3e4);
   Vec3 galaxyCenter = Vec3(30, 30, 30);
   float rb = 3.0f;
   float mb = 15.0f;
@@ -135,9 +135,10 @@ void galaxySimulationP3M() {
 
   float a = 3 * H;
   float re = 0.7f * a;
-  P3MMethod p3m(pm, effectiveBoxSize, re, a, H);
+  float softeningLength = 1.5f;
+  P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength);
 
-  p3m.run(20, true /*diagnostics*/);
+  p3m.run(150, true /*diagnostics*/);
 }
 
 void smallSimPP() {
@@ -182,7 +183,8 @@ void smallSimP3M() {
 
   float a = 7.5f;
   float re = 0.7f * a;
-  P3MMethod p3m(pm, effectiveBoxSize, re, a, H);
+  float softeningLength = 0.5f;
+  P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength);
   p3m.run(simLength, true, false, "output-p3m.txt");
   // pm.run(simLength, true, false, "output-pm.txt");
 }
@@ -192,5 +194,5 @@ int main() {
   // smallSimP3M();
   //   probeField();
   galaxySimulationP3M();
-  //   galaxySimulationPM();
+  // galaxySimulationPM();
 }

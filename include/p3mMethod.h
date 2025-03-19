@@ -14,6 +14,7 @@ class P3MMethod {
   int tabulatedValuesCnt;
   float deltaSquared;
   std::vector<float> FTable;
+  const float softeningLength;
   bool useSRForceTable;
 
  public:
@@ -22,6 +23,7 @@ class P3MMethod {
             float cutoffRadius,
             float particleDiameter,
             float H,
+            float softeningLength,
             bool useSRForceTable = true);
 
   void run(const int simLength,

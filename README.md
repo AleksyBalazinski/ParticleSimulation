@@ -50,4 +50,8 @@ python script/conserved_quantities.py build/source/Debug/energy.txt build/source
 ```
 ## Results
 ### Spiral galaxy simulation
+#### PM method (CIC assignment, 50k particles)
 ![](results/img/spiral_galaxy.png)
+
+#### P3M method (TSC assignment, 30k particles)
+![alt text](results/img/spiral-p3m.png)
