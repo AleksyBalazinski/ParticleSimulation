@@ -44,10 +44,11 @@ void probeField() {
   float effectiveBoxSize = 60;
   float H = effectiveBoxSize / (gridPoints / 2);
   float DT = 1;
+  float particleDiameter = 4 * H;
 
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
               InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL,
-              grid);
+              particleDiameter, grid);
 
   pm.run(2, true /*diagnostics*/, true /*field*/);
 }
@@ -89,7 +90,7 @@ void galaxySimulationPM() {
 
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
               InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
-              GreensFunction::DISCRETE_LAPLACIAN, grid);
+              GreensFunction::DISCRETE_LAPLACIAN, 0, grid);
 
   pm.run(200, true /*diagnostics*/);
 }
@@ -128,15 +129,15 @@ void galaxySimulationP3M() {
   float effectiveBoxSize = 60;
   float H = effectiveBoxSize / (gridPoints / 2);
   float DT = 1;
+  float a = 3 * H;
 
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
-              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL,
+              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S2_OPTIMAL, a,
               grid);
 
-  float a = 3 * H;
   float re = 0.7f * a;
   float softeningLength = 1.5f;
-  P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength);
+  P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S2);
 
   p3m.run(150, true /*diagnostics*/);
 }
@@ -176,16 +177,16 @@ void smallSimP3M() {
   float DT = 1;
   auto externalField = [](Vec3 pos) -> Vec3 { return Vec3(); };
   auto externalPotential = [](Vec3 pos) -> float { return 0; };
+  float a = 7.5f;
 
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
-              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL,
+              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL, a,
               grid);
 
-  float a = 7.5f;
   float re = 0.7f * a;
   float softeningLength = 0.5f;
-  P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength);
-  p3m.run(simLength, true, false, "output-p3m.txt");
+  P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S1);
+  p3m.run(simLength, true /*diagnostics*/, "output-p3m.txt");
   // pm.run(simLength, true, false, "output-pm.txt");
 }
 

@@ -87,15 +87,13 @@ void PMMethod::initGreensFunction() {
       G = GreenDiscreteLaplacian(kx, ky, kz, dim);
     } else if (gFunc == GreensFunction::S1_OPTIMAL) {
       if (is == InterpolationScheme::TSC) {
-        // TODO: remove hard-coded value
-        G = GreenOptimalTSC(kx, ky, kz, dim, lengthToCodeUnits(7.5f, H), CloudShape::S1, fds);
+        G = GreenOptimalTSC(kx, ky, kz, dim, particleDiameter, CloudShape::S1, fds);
       } else {
         throw std::invalid_argument("not implemented");
       }
     } else if (gFunc == GreensFunction::S2_OPTIMAL) {
       if (is == InterpolationScheme::TSC) {
-        // TODO: remove hard-coded value
-        G = GreenOptimalTSC(kx, ky, kz, dim, lengthToCodeUnits(7.5, H), CloudShape::S2, fds);
+        G = GreenOptimalTSC(kx, ky, kz, dim, particleDiameter, CloudShape::S2, fds);
       } else {
         throw std::invalid_argument("not implemented");
       }
@@ -302,6 +300,7 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
                    const InterpolationScheme is,
                    const FiniteDiffScheme fds,
                    const GreensFunction gFunc,
+                   const float particleDiameter,
                    Grid& grid)
     : effectiveBoxSize(effectiveBoxSize),
       externalField(externalField),
@@ -312,6 +311,7 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
       is(is),
       fds(fds),
       gFunc(gFunc),
+      particleDiameter(lengthToCodeUnits(particleDiameter, H)),
       grid(grid) {
   this->N = static_cast<int>(masses.size());
   for (int i = 0; i < N; ++i) {

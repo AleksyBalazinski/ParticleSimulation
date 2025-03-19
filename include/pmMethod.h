@@ -22,6 +22,7 @@ class PMMethod {
   InterpolationScheme is;
   FiniteDiffScheme fds;
   GreensFunction gFunc;
+  float particleDiameter;
 
   void spreadMass();
 
@@ -33,7 +34,7 @@ class PMMethod {
 
   void updateAccelerations();
 
-  public:
+ public:
   PMMethod(const std::vector<Vec3>& state,
            const std::vector<float>& masses,
            const float effectiveBoxSize,
@@ -45,6 +46,7 @@ class PMMethod {
            const InterpolationScheme is,
            const FiniteDiffScheme fds,
            const GreensFunction gFunc,
+           const float particleDiameter,
            Grid& grid);
 
   std::string run(const int simLength,
