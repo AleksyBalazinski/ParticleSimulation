@@ -132,12 +132,12 @@ void galaxySimulationP3M() {
   float a = 3 * H;
 
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
-              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S2_OPTIMAL, a,
+              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL, a,
               grid);
 
   float re = 0.7f * a;
   float softeningLength = 1.5f;
-  P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S2);
+  P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S1);
 
   p3m.run(150, true /*diagnostics*/);
 }
@@ -154,7 +154,21 @@ void smallSimPP() {
   float DT = 1;
   float G = 4.5e-3f;
 
-  ppMethod(state, masses, simLength, DT, G, "output-pp.txt");
+  ppMethodLeapfrog(state, masses, simLength, DT, G, "output-pp.txt");
+}
+
+void bigSimPP() {
+  const int n = 30000;
+  std::vector<float> masses = randomMasses(n, {0.002, 0.002});
+  std::vector<Vec3> state =
+      randomInitialState(n, {Vec3(15, 15, 15), Vec3(45, 45, 45)},
+                         {Vec3(-0.01f, -0.01f, -0.01f), Vec3(0.01f, 0.01f, 0.01f)});
+
+  int simLength = -1;
+  float DT = 1;
+  float G = 4.5e-3f;
+
+  ppMethodLeapfrog(state, masses, simLength, DT, G, "output-pp.txt");
 }
 
 void smallSimP3M() {
@@ -192,8 +206,9 @@ void smallSimP3M() {
 
 int main() {
   // smallSimPP();
+  // bigSimPP();
   // smallSimP3M();
-  //   probeField();
+  // probeField();
   galaxySimulationP3M();
   // galaxySimulationPM();
 }

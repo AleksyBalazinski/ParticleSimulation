@@ -1,10 +1,10 @@
 #include "ppMethod.h"
 #include <cmath>
+#include <iostream>
 #include "RK4Stepper.h"
+#include "leapfrog.h"
 #include "simInfo.h"
 #include "stateRecorder.h"
-
-// #define LEAPFROG
 
 Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<float>& masses, float G) {
   const int n = (int)masses.size();
@@ -14,11 +14,27 @@ Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<float>& m
       continue;
 
     Vec3 rij = r[i] - r[j];
-    float eps = 0.01f;
+    float eps = 0;
     acc += -1.0f * G * masses[j] / std::powf(rij.getMagnitudeSquared() + eps * eps, 1.5f) * rij;
   }
 
   return acc;
+}
+
+void updateAccelerations(std::vector<Particle>& particles, float G) {
+  for (auto& p : particles) {
+    p.acceleration = Vec3(0, 0, 0);
+  }
+
+  for (int i = 0; i < particles.size(); ++i) {
+    for (int j = i + 1; j < particles.size(); ++j) {
+      Vec3 rij = particles[i].position - particles[j].position;
+      float eps = 0;
+      float denom = std::powf(rij.getMagnitudeSquared() + eps * eps, 1.5f);
+      particles[i].acceleration += -1 * G * particles[j].mass / denom * rij;
+      particles[j].acceleration += G * particles[i].mass / denom * rij;
+    }
+  }
 }
 
 typedef std::vector<Vec3> StateType;
@@ -42,60 +58,68 @@ void setIntegerStepVelocities(const std::vector<Vec3>& state,
   }
 }
 
-std::string ppMethod(std::vector<Vec3>& state,
-                     std::vector<float>& masses,
-                     const int simLength,
-                     const float stepSize,
-                     const float G,
-                     const char* positionsPath,
-                     const char* energyPath,
-                     const char* momentumPath) {
+std::string ppMethodRK4(std::vector<Vec3>& state,
+                        std::vector<float>& masses,
+                        const int simLength,
+                        const float stepSize,
+                        const float G,
+                        const char* positionsPath,
+                        const char* energyPath,
+                        const char* momentumPath) {
   const int n = (int)masses.size();
   StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, "", "");
-#ifdef LEAPFROG
-  // set v_(1/2)
-  // from this point on state[n + i] holds velocities at half-step
-  for (int i = 0; i < n; i++) {
-    state[n + i] += 0.5 * stepSize * acceleration(i, state, masses, G);
-  }
-  std::vector<Vec3> velocities(n);  // velocities at integer step (needed only for display)
-#else
+
   auto system = [&masses, G](StateType& x, StateType& dxdt, float t) {
     nBody(x, dxdt, t, masses, G);
   };
 
   RK4Stepper<Vec3> stepper(system, 2 * n);
-#endif
-  for (float t = 0; t <= simLength; ++t) {
-#ifdef LEAPFROG
-    for (int i = 0; i < n; i++) {
-      state[i] += stepSize * state[n + i];
-    }
-#endif
 
-#ifdef LEAPFROG
-    setIntegerStepVelocities(state, masses, G, stepSize, velocities);
-    stateRecorder.recordEnergy(potentialEnergy(state.begin(), state.begin() + n, masses, G),
-                               kineticEnergy(velocities.begin(), velocities.end(), masses, G));
-#endif
+  for (float t = 0; t <= simLength; ++t) {
     stateRecorder.recordEnergy(
         SimInfo::potentialEnergy(state.begin(), state.begin() + n, masses, G),
         SimInfo::kineticEnergy(state.begin() + n, state.end(), masses, G));
     stateRecorder.recordPositions(state.begin(), state.begin() + n);
 
-#ifdef LEAPFROG
-    stateRecorder.recordTotalMomentum(totalMomentum(state.begin() + n, state.end(), masses));
-#endif
     stateRecorder.recordTotalMomentum(
         SimInfo::totalMomentum(state.begin() + n, state.end(), masses));
 
-#ifdef LEAPFROG
-    for (int i = 0; i < n; i++) {
-      state[n + i] += stepSize * acceleration(i, state, masses, G);
-    }
-#else
     stepper.doStep(state, stepSize);
-#endif
+  }
+
+  return stateRecorder.flush();
+}
+
+std::string ppMethodLeapfrog(const std::vector<Vec3>& state,
+                             const std::vector<float>& masses,
+                             const int simLength,
+                             const float stepSize,
+                             const float G,
+                             const char* positionsPath,
+                             const char* energyPath,
+                             const char* momentumPath) {
+  const int N = int(masses.size());
+  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, "", "");
+  std::vector<Particle> particles;
+  for (int i = 0; i < N; ++i) {
+    particles.emplace_back(state[i], state[N + i], masses[i]);
+  }
+
+  updateAccelerations(particles, G);
+  setHalfStepVelocities(particles, stepSize);
+
+  for (int t = 0; t <= simLength; ++t) {
+    std::cout << "progress: " << float(t) / simLength << '\r';
+    std::cout.flush();
+
+    updatePositions(particles, stepSize);
+    stateRecorder.recordPositions(particles);
+
+    setIntegerStepVelocities(particles);
+    stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
+
+    updateAccelerations(particles, G);
+    updateVelocities(particles, stepSize);
   }
 
   return stateRecorder.flush();

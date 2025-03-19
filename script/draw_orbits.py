@@ -51,6 +51,7 @@ ax.set_xlim(0, 60)
 ax.set_ylim(0, 60)
 ax.set_xlabel('x (kpc)')
 ax.set_ylabel('y (kpc)')
+ax.grid(True)
 
 time_step = 1  # 1 Myr per update
 
@@ -60,6 +61,7 @@ def update(frame_num):
     ax.set_ylim(0, 60)
     ax.set_xlabel('x (kpc)')
     ax.set_ylabel('y (kpc)')
+    ax.grid(True)
     ax.text(45, 55, f'Time: {frame_num * time_step} Myr', fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
     
     for i in range(num_particles):

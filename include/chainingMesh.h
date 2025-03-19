@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <memory>
 #include <tuple>
 #include <vector>
 #include "particle.h"
@@ -14,23 +15,21 @@ class ChainingMesh {
   float HC;
   int size;
   std::vector<LLNode*> hoc;
+  std::unique_ptr<LLNode[]> nodePool;
 
  public:
   struct LLNode {
     int particleId;
     LLNode* next;
     LLNode(int particleId, LLNode* next);
+    LLNode() = default;
   };
 
-  ChainingMesh(float compBoxSize, float cutoffRadius, float H);
-
-  ~ChainingMesh();
+  ChainingMesh(float compBoxSize, float cutoffRadius, float H, int N);
 
   void fill(const std::vector<Particle>& particles);
 
   void fillWithYSorting(const std::vector<Particle>& particles);
-
-  void clear();
 
   std::array<int, 14> getNeighborsAndSelf(int cellIdx) const;
 

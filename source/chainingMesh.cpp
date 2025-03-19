@@ -1,15 +1,12 @@
 #include "chainingMesh.h"
 #include "unitConversions.h"
 
-ChainingMesh::ChainingMesh(float compBoxSize, float cutoffRadius, float H)
+ChainingMesh::ChainingMesh(float compBoxSize, float cutoffRadius, float H, int N)
     : M(int(compBoxSize / cutoffRadius)),
       HC(lengthToCodeUnits(compBoxSize / M, H)),
       size(M * M * M),
-      hoc(size, nullptr) {}
-
-ChainingMesh::~ChainingMesh() {
-  clear();
-}
+      hoc(size, nullptr),
+      nodePool(new LLNode[N]) {}
 
 void ChainingMesh::fill(const std::vector<Particle>& particles) {
   std::memset(hoc.data(), 0, size * sizeof(LLNode*));
@@ -38,25 +35,15 @@ void ChainingMesh::fillWithYSorting(const std::vector<Particle>& particles) {
     int cellIdx = tripleToFlatIndex(cellX, cellY, cellZ);
     LLNode* head = hoc[cellIdx];
     if (head == nullptr || particles[head->particleId].position.y > p.position.y) {
-      hoc[cellIdx] = new LLNode(i, head);
+      hoc[cellIdx] = new (nodePool.get() + i) LLNode(i, head);
       continue;
     }
 
     for (LLNode* node = head; node != nullptr; node = node->next) {
       if (node->next == nullptr || particles[node->next->particleId].position.y > p.position.y) {
-        node->next = new LLNode(i, node->next);
+        node->next = new (nodePool.get() + i) LLNode(i, node->next);
         break;
       }
-    }
-  }
-}
-
-void ChainingMesh::clear() {
-  for (int i = 0; i < size; ++i) {
-    for (LLNode* node = hoc[i]; node != nullptr;) {
-      LLNode* next = node->next;
-      delete node;
-      node = next;
     }
   }
 }

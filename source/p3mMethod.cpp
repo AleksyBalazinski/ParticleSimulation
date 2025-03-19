@@ -9,6 +9,7 @@
 #include <ranges>
 #include <thread>
 #include "leapfrog.h"
+#include "measureTime.h"
 #include "unitConversions.h"
 
 P3MMethod::P3MMethod(PMMethod& pmMethod,
@@ -20,7 +21,7 @@ P3MMethod::P3MMethod(PMMethod& pmMethod,
                      CloudShape cloudShape,
                      bool useSRForceTable)
     : pmMethod(pmMethod),
-      chainingMesh(compBoxSize, cutoffRadius, H),
+      chainingMesh(compBoxSize, cutoffRadius, H, int(pmMethod.getParticles().size())),
       cutoffRadius(lengthToCodeUnits(cutoffRadius, pmMethod.getH())),
       particleDiameter(lengthToCodeUnits(particleDiameter, H)),
       softeningLength(lengthToCodeUnits(softeningLength, H)),
@@ -34,6 +35,11 @@ P3MMethod::P3MMethod(PMMethod& pmMethod,
   }
 }
 
+declareTimeAcc(chainingMeshSetup);
+declareTimeAcc(shortRangeForcesCalc);
+declareTimeAcc(pmStep);
+declareTimeAcc(correctAccelerations);
+
 void P3MMethod::calculateShortRangeForces(std::vector<Particle>& particles) {
   const int maxThreads = std::thread::hardware_concurrency();
   std::for_each(std::execution::par, particles.begin(), particles.end(), [](Particle& p) {
@@ -43,8 +49,7 @@ void P3MMethod::calculateShortRangeForces(std::vector<Particle>& particles) {
     }
   });
 
-  chainingMesh.clear();
-  chainingMesh.fillWithYSorting(particles);
+  measureTime(chainingMeshSetup, chainingMesh.fillWithYSorting(particles));
 
   std::vector<std::thread> smallCellThreads;
   for (int tid = 0; tid < maxThreads; ++tid) {
@@ -88,9 +93,9 @@ void P3MMethod::run(const int simLength,
   massToCodeUnits(particles, H, DT, G);
 
   pmMethod.initGreensFunction();
-  pmMethod.pmMethodStep();
-  calculateShortRangeForces(particles);
-  correctAccelerations(particles);
+  measureTime(pmStep, pmMethod.pmMethodStep());
+  measureTime(shortRangeForcesCalc, calculateShortRangeForces(particles));
+  measureTime(correctAccelerations, correctAccelerations(particles));
 
   setHalfStepVelocities(particles);
 
@@ -132,12 +137,17 @@ void P3MMethod::run(const int simLength,
       integerStepVelocitiesToCodeUnits(particles, H, DT);
     }
 
-    pmMethod.pmMethodStep();
-    calculateShortRangeForces(particles);
-    correctAccelerations(particles);
+    measureTime(pmStep, pmMethod.pmMethodStep());
+    measureTime(shortRangeForcesCalc, calculateShortRangeForces(particles));
+    measureTime(correctAccelerations, correctAccelerations(particles));
 
     updateVelocities(particles);
   }
+
+  printTime(chainingMeshSetup);
+  printTime(shortRangeForcesCalc);
+  printTime(pmStep);
+  printTime(correctAccelerations);
 
   stateRecorder.flush();
 }
@@ -189,7 +199,6 @@ Vec3 P3MMethod::shortRangeForce(Vec3 rij, float mi, float mj, float a) {
 Vec3 P3MMethod::shortRangeForceFromTable(Vec3 rij, float mi, float mj, float a) {
   float ksi = rij.getMagnitudeSquared() / deltaSquared;
   int t = int(ksi);
-  assert(t < tabulatedValuesCnt - 1);
   float F = mi * mj * (FTable[t] + (ksi - t) * (FTable[t + 1] - FTable[t]));
   return F * rij;
 }
