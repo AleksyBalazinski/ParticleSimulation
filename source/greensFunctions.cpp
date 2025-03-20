@@ -59,6 +59,17 @@ std::array<std::complex<float>, 3> D2Fourier(std::array<float, 3> k) {
   return D;
 }
 
+std::array<std::complex<float>, 3> D4Fourier(std::array<float, 3> k) {
+  std::array<std::complex<float>, 3> D;
+  std::complex<float> I(0, 1);
+  float alpha = 4.0f / 3;
+  for (int i = 0; i < 3; i++) {
+    D[i] = I * alpha * std::sinf(k[i]) + I * (1 - alpha) * std::sinf(2 * k[i]) / 2.0f;
+  }
+
+  return D;
+}
+
 std::complex<float> dotProduct(std::array<std::complex<float>, 3> a,
                                std::array<std::complex<float>, 3> b) {
   std::complex<float> dot(0, 0);
@@ -98,6 +109,8 @@ std::complex<float> GreenOptimalTSC(int kx,
   std::array<std::complex<float>, 3> D;
   if (fds == FiniteDiffScheme::TWO_POINT) {
     D = D2Fourier(k);
+  } else if (fds == FiniteDiffScheme::FOUR_POINT) {
+    D = D4Fourier(k);
   } else {
     throw std::invalid_argument("not implemented");
   }
