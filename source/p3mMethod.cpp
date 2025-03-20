@@ -1,14 +1,11 @@
 #include "p3mMethod.h"
 #include <algorithm>
-#include <cassert>
 #include <cmath>
-#include <ctime>
 #include <execution>
 #include <iostream>
 #include <numbers>
 #include <numeric>
 #include <ranges>
-#include <sstream>
 #include <thread>
 #include "leapfrog.h"
 #include "measureTime.h"
