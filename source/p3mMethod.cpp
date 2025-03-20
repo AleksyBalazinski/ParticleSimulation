@@ -2,18 +2,20 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <ctime>
 #include <execution>
 #include <iostream>
 #include <numbers>
 #include <numeric>
 #include <ranges>
+#include <sstream>
 #include <thread>
 #include "leapfrog.h"
 #include "measureTime.h"
 #include "unitConversions.h"
 
 P3MMethod::P3MMethod(PMMethod& pmMethod,
-                     float compBoxSize,
+                     std::tuple<float, float, float> compBoxSize,
                      float cutoffRadius,
                      float particleDiameter,
                      float H,
@@ -70,6 +72,8 @@ void correctAccelerations(std::vector<Particle>& particles) {
     p.acceleration += totalSRForce / p.mass;
   });
 }
+
+std::array<float, 12> threadTimes;
 
 void P3MMethod::run(const int simLength,
                     bool collectDiagnostics,
@@ -148,6 +152,10 @@ void P3MMethod::run(const int simLength,
   printTime(shortRangeForcesCalc);
   printTime(pmStep);
   printTime(correctAccelerations);
+
+  for (int i = 0; i < 12; ++i) {
+    std::cout << "thread " << i << " was working for " << threadTimes[i] << " ms\n";
+  }
 
   stateRecorder.flush();
 }
@@ -254,6 +262,7 @@ void P3MMethod::initSRForceTable() {
 }
 
 void P3MMethod::updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Particle>& particles) {
+  auto start = std::chrono::steady_clock::now();
   for (int q = tid; q < chainingMesh.getSize(); q += threadsCnt) {
     auto neighbors = chainingMesh.getNeighborsAndSelf(q);
     for (int i = 0; i < neighbors.size(); ++i) {
@@ -274,4 +283,7 @@ void P3MMethod::updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Par
       }
     }
   }
+  auto end = std::chrono::steady_clock::now();
+  auto elapsedMilliSeconds = (end - start).count() * 1e-6f;
+  threadTimes[tid] += elapsedMilliSeconds;
 }

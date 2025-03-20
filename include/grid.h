@@ -9,13 +9,15 @@
 
 class Grid {
  private:
-  int gridPoints;
+  int gridPointsX;
+  int gridPointsY;
+  int gridPointsZ;
   int length;
   std::vector<Vec3> field;
 
   long mod(long a, long b) const { return (a % b + b) % b; }
 
-  long getWrappedIndx(int i, int j, int k, int dim) const;
+  long getWrappedIndx(int i, int j, int k) const;
 
   long getIndx(int i, int j, int k) const;
 
@@ -29,7 +31,7 @@ class Grid {
   FFTAdapter<float>& fftAdapter;
 
  public:
-  Grid(int gridPoints, FFTAdapter<float>& fftAdapter);
+  Grid(std::tuple<int, int, int> gridPoints, FFTAdapter<float>& fftAdapter);
 
   std::tuple<int, int, int> indexTripleFromFlat(int flatIndex) const;
 
@@ -45,7 +47,9 @@ class Grid {
 
   int getLength() const { return length; }
 
-  int getGridPoints() const { return gridPoints; }
+  std::tuple<int, int, int> getGridPoints() const {
+    return std::make_tuple(gridPointsX, gridPointsY, gridPointsZ);
+  }
 
   const std::vector<std::complex<float>>& fftDensity();
 

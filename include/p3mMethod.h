@@ -21,7 +21,7 @@ class P3MMethod {
 
  public:
   P3MMethod(PMMethod& pmMethod,
-            float compBoxSize,
+            std::tuple<float, float, float> compBoxSize,
             float cutoffRadius,
             float particleDiameter,
             float H,

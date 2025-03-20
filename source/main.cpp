@@ -37,12 +37,12 @@ void probeField() {
   auto externalField = [](Vec3 pos) -> Vec3 { return Vec3(); };
   auto externalPotential = [](Vec3 pos) -> float { return 0; };
 
-  int gridPoints = 64;
-  int dims[] = {gridPoints, gridPoints, gridPoints};
+  auto gridPoints = std::make_tuple(64, 64, 32);
+  int dims[] = {std::get<2>(gridPoints), std::get<1>(gridPoints), std::get<0>(gridPoints)};
   KissFFTAdapter<float> fftAdapter(dims, 3);
   Grid grid(gridPoints, fftAdapter);
-  float effectiveBoxSize = 60;
-  float H = effectiveBoxSize / (gridPoints / 2);
+  auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
+  float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
   float DT = 1;
   float particleDiameter = 4 * H;
 
@@ -61,7 +61,7 @@ void galaxySimulationPM() {
     [T] = Myr
     */
   const int n = int(5e4);
-  Vec3 galaxyCenter = Vec3(30, 30, 30);
+  Vec3 galaxyCenter = Vec3(30, 30, 15);
   float rb = 3.0f;
   float mb = 15.0f;
   float rd = 15.0f;
@@ -80,12 +80,12 @@ void galaxySimulationPM() {
     return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
   };
 
-  int gridPoints = 64;
-  int dims[] = {gridPoints, gridPoints, gridPoints};
+  auto gridPoints = std::make_tuple(64, 64, 32);
+  int dims[] = {std::get<2>(gridPoints), std::get<1>(gridPoints), std::get<0>(gridPoints)};
   KissFFTAdapter<float> fftAdapter(dims, 3);
   Grid grid(gridPoints, fftAdapter);
-  float effectiveBoxSize = 60;
-  float H = effectiveBoxSize / (gridPoints / 2);
+  auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
+  float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
   float DT = 1;
 
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
@@ -103,7 +103,7 @@ void galaxySimulationP3M() {
     [T] = Myr
     */
   const int n = int(4e4);
-  Vec3 galaxyCenter = Vec3(30, 30, 30);
+  Vec3 galaxyCenter = Vec3(30, 30, 15);
   float rb = 3.0f;
   float mb = 15.0f;
   float rd = 15.0f;
@@ -122,12 +122,12 @@ void galaxySimulationP3M() {
     return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
   };
 
-  int gridPoints = 64;
-  int dims[] = {gridPoints, gridPoints, gridPoints};
+  auto gridPoints = std::make_tuple(64, 64, 32);
+  int dims[] = {std::get<2>(gridPoints), std::get<1>(gridPoints), std::get<0>(gridPoints)};
   KissFFTAdapter<float> fftAdapter(dims, 3);
   Grid grid(gridPoints, fftAdapter);
-  float effectiveBoxSize = 60;
-  float H = effectiveBoxSize / (gridPoints / 2);
+  auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
+  float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
   float DT = 1;
   float a = 3 * H;
 
@@ -139,7 +139,7 @@ void galaxySimulationP3M() {
   float softeningLength = 1.5f;
   P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S1);
 
-  p3m.run(200, true /*diagnostics*/);
+  p3m.run(150, true /*diagnostics*/);
 }
 
 void smallSimPP() {
@@ -182,12 +182,12 @@ void smallSimP3M() {
   int simLength = 100;
   float G = 4.5e-3f;
 
-  int gridPoints = 64;
-  int dims[] = {gridPoints, gridPoints, gridPoints};
+  auto gridPoints = std::make_tuple(64, 64, 32);
+  int dims[] = {std::get<2>(gridPoints), std::get<1>(gridPoints), std::get<0>(gridPoints)};
   KissFFTAdapter<float> fftAdapter(dims, 3);
   Grid grid(gridPoints, fftAdapter);
-  float effectiveBoxSize = 60;
-  float H = effectiveBoxSize / (gridPoints / 2);
+  auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
+  float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
   float DT = 1;
   auto externalField = [](Vec3 pos) -> Vec3 { return Vec3(); };
   auto externalPotential = [](Vec3 pos) -> float { return 0; };

@@ -17,9 +17,9 @@
 #include "unitConversions.h"
 #include "vec3.h"
 
-bool isWithingBox(const Vec3& pos, float boxSize) {
-  return pos.x >= 0 && pos.x <= boxSize && pos.y >= 0 && pos.y <= boxSize && pos.z >= 0 &&
-         pos.z <= boxSize;
+bool isWithingBox(const Vec3& pos, float boxSizeX, float boxSizeY, float boxSizeZ) {
+  return pos.x >= 0 && pos.x <= boxSizeX && pos.y >= 0 && pos.y <= boxSizeY && pos.z >= 0 &&
+         pos.z <= boxSizeZ;
 }
 
 Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, Grid& grid) {
@@ -45,10 +45,9 @@ Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, Grid& grid) {
 }
 
 void PMMethod::findFourierPotential() {
-  int dim = grid.getGridPoints();
   grid.setPotentialFourier(0, 0, 0, std::complex<float>(0, 0));
-  auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
-  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dim, this](int idx) {
+  auto gridRange = std::ranges::views::iota(0, grid.getLength());
+  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [this](int idx) {
     auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
 
     auto densityFourier = grid.getDensityFourier(kx, ky, kz);
@@ -77,23 +76,23 @@ void PMMethod::updateAccelerations() {
 }
 
 void PMMethod::initGreensFunction() {
-  int dim = grid.getGridPoints();
-  auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
-  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dim, this](int idx) {
+  auto dims = grid.getGridPoints();
+  auto gridRange = std::ranges::views::iota(0, grid.getLength());
+  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dims, this](int idx) {
     auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
 
     std::complex<float> G;
     if (gFunc == GreensFunction::DISCRETE_LAPLACIAN) {
-      G = GreenDiscreteLaplacian(kx, ky, kz, dim);
+      G = GreenDiscreteLaplacian(kx, ky, kz, dims);
     } else if (gFunc == GreensFunction::S1_OPTIMAL) {
       if (is == InterpolationScheme::TSC) {
-        G = GreenOptimalTSC(kx, ky, kz, dim, particleDiameter, CloudShape::S1, fds);
+        G = GreenOptimalTSC(kx, ky, kz, dims, particleDiameter, CloudShape::S1, fds);
       } else {
         throw std::invalid_argument("not implemented");
       }
     } else if (gFunc == GreensFunction::S2_OPTIMAL) {
       if (is == InterpolationScheme::TSC) {
-        G = GreenOptimalTSC(kx, ky, kz, dim, particleDiameter, CloudShape::S2, fds);
+        G = GreenOptimalTSC(kx, ky, kz, dims, particleDiameter, CloudShape::S2, fds);
       } else {
         throw std::invalid_argument("not implemented");
       }
@@ -124,8 +123,9 @@ void PMMethod::pmMethodStep() {
 
 bool PMMethod::escapedComputationalBox() {
   return std::any_of(
-      std::execution::par_unseq, particles.begin(), particles.end(),
-      [this](const Particle& p) { return !isWithingBox(p.position, effectiveBoxSize); });
+      std::execution::par_unseq, particles.begin(), particles.end(), [this](const Particle& p) {
+        return !isWithingBox(p.position, effectiveBoxSizeX, effectiveBoxSizeY, effectiveBoxSizeZ);
+      });
 }
 
 Vec3 PMMethod::totalExternalForceOrigUnits() {
@@ -291,7 +291,7 @@ Vec3 PMMethod::interpolateField(Vec3 position) {
 
 PMMethod::PMMethod(const std::vector<Vec3>& state,
                    const std::vector<float>& masses,
-                   const float effectiveBoxSize,
+                   const std::tuple<float, float, float> effectiveBoxSize,
                    const std::function<Vec3(Vec3)> externalField,
                    const std::function<float(Vec3)> externalPotential,
                    const float H,
@@ -302,7 +302,9 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
                    const GreensFunction gFunc,
                    const float particleDiameter,
                    Grid& grid)
-    : effectiveBoxSize(effectiveBoxSize),
+    : effectiveBoxSizeX(std::get<0>(effectiveBoxSize)),
+      effectiveBoxSizeY(std::get<1>(effectiveBoxSize)),
+      effectiveBoxSizeZ(std::get<2>(effectiveBoxSize)),
       externalField(externalField),
       externalPotential(externalPotential),
       H(H),

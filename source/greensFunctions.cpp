@@ -78,14 +78,20 @@ float TSCAliasSum(std::array<float, 3> k) {
   return sum;
 }
 
-std::complex<float>
-GreenOptimalTSC(int kx, int ky, int kz, int dim, float a, CloudShape cs, FiniteDiffScheme fds) {
+std::complex<float> GreenOptimalTSC(int kx,
+                                    int ky,
+                                    int kz,
+                                    std::tuple<int, int, int> dims,
+                                    float a,
+                                    CloudShape cs,
+                                    FiniteDiffScheme fds) {
   if (kx == 0 && ky == 0 && kz == 0) {
     return 0;
   }
 
-  std::array<float, 3> k = {2 * pi * float(kx) / dim, 2 * pi * float(ky) / dim,
-                            2 * pi * float(kz) / dim};
+  std::array<float, 3> k = {2 * pi * float(kx) / std::get<0>(dims),
+                            2 * pi * float(ky) / std::get<1>(dims),
+                            2 * pi * float(kz) / std::get<2>(dims)};
 
   float denomSum = TSCAliasSum(k);
 
@@ -120,13 +126,13 @@ GreenOptimalTSC(int kx, int ky, int kz, int dim, float a, CloudShape cs, FiniteD
   return numerator / denominator;
 }
 
-std::complex<float> GreenDiscreteLaplacian(int kx, int ky, int kz, int dim) {
+std::complex<float> GreenDiscreteLaplacian(int kx, int ky, int kz, std::tuple<int, int, int> dims) {
   if (kx == 0 && ky == 0 && kz == 0) {
     return 0;
   }
 
-  auto sx = std::sinf(pi * kx / dim);
-  auto sy = std::sinf(pi * ky / dim);
-  auto sz = std::sinf(pi * kz / dim);
+  auto sx = std::sinf(pi * kx / std::get<0>(dims));
+  auto sy = std::sinf(pi * ky / std::get<1>(dims));
+  auto sz = std::sinf(pi * kz / std::get<2>(dims));
   return -0.25f / (sx * sx + sy * sy + sz * sz);
 }

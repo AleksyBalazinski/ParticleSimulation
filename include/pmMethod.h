@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <tuple>
 #include <vector>
 #include "grid.h"
 #include "particle.h"
@@ -11,7 +12,9 @@
 class PMMethod {
  private:
   Grid& grid;
-  float effectiveBoxSize;
+  float effectiveBoxSizeX;
+  float effectiveBoxSizeY;
+  float effectiveBoxSizeZ;
   std::vector<Particle> particles;
   int N;
   std::function<Vec3(Vec3)> externalField;
@@ -37,7 +40,7 @@ class PMMethod {
  public:
   PMMethod(const std::vector<Vec3>& state,
            const std::vector<float>& masses,
-           const float effectiveBoxSize,
+           const std::tuple<float, float, float> effectiveBoxSize,
            const std::function<Vec3(Vec3)> externalField,
            const std::function<float(Vec3)> externalPotential,
            const float H,

@@ -11,8 +11,12 @@ class ChainingMesh {
   struct LLNode;
 
  private:
-  int M;
-  float HC;
+  int Mx;
+  int My;
+  int Mz;
+  float HCx;
+  float HCy;
+  float HCz;
   int size;
   std::vector<LLNode*> hoc;
   std::unique_ptr<LLNode[]> nodePool;
@@ -25,7 +29,7 @@ class ChainingMesh {
     LLNode() = default;
   };
 
-  ChainingMesh(float compBoxSize, float cutoffRadius, float H, int N);
+  ChainingMesh(std::tuple<float, float, float> compBoxSize, float cutoffRadius, float H, int N);
 
   void fillWithYSorting(const std::vector<Particle>& particles);
 
@@ -35,7 +39,7 @@ class ChainingMesh {
 
   int getSize() const;
 
-  int getLength() const;
+  std::tuple<int, int, int> getLength() const;
 
  private:
   int tripleToFlatIndex(int x, int y, int z) const;
