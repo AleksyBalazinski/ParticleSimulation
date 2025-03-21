@@ -6,19 +6,6 @@
 #include "simInfo.h"
 
 class P3MMethod {
- private:
-  PMMethod& pmMethod;
-  ChainingMesh chainingMesh;
-  SimInfo simInfo;
-  float cutoffRadius;
-  float particleDiameter;
-  int tabulatedValuesCnt;
-  float deltaSquared;
-  std::vector<float> FTable;
-  const float softeningLength;
-  bool useSRForceTable;
-  const CloudShape cloudShape;
-
  public:
   P3MMethod(PMMethod& pmMethod,
             std::tuple<float, float, float> compBoxSize,
@@ -41,16 +28,25 @@ class P3MMethod {
   void calculateShortRangeForces(std::vector<Particle>& particles);
 
   float referenceForceS1(float r, float a);
-
   float referenceForceS2(float r, float a);
 
   Vec3 shortRangeForce(Vec3 rij, float mi, float mj, float a);
-
   Vec3 shortRangeForceFromTable(Vec3 rij, float mi, float mj, float a);
 
   void updateSRForces(int i, int j, int q, int qn, int qnLocal, std::vector<Particle>& particles);
-
   void initSRForceTable();
-
   void updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Particle>& particles);
+
+  PMMethod& pmMethod;
+  ChainingMesh chainingMesh;
+  SimInfo simInfo;
+
+  float cutoffRadius;
+  float particleDiameter;
+  int tabulatedValuesCnt;
+  float deltaSquared;
+  std::vector<float> FTable;
+  const float softeningLength;
+  bool useSRForceTable;
+  const CloudShape cloudShape;
 };

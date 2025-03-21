@@ -5,8 +5,6 @@
 
 template <typename T>
 class FFTAdapter {
-  using Ty = std::complex<T>;
-
  public:
   virtual ~FFTAdapter() {};
 

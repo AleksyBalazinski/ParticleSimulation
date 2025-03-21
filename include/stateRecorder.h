@@ -7,7 +7,31 @@
 #include "vec3.h"
 
 class StateRecorder {
+ public:
+  StateRecorder(const char* positionsPath,
+                const char* energyPath,
+                const char* momentumPath,
+                const char* expectedMomentumPath,
+                const char* angularMomentumPath,
+                const char* fieldPath,
+                int maxRecords = 500);
+  ~StateRecorder();
+
+  void recordPositions(std::vector<Vec3>::iterator begin, std::vector<Vec3>::iterator end);
+  void recordPositions(const std::vector<Particle>& particles);
+
+  void recordEnergy(float pe, float ke);
+  void recordTotalMomentum(Vec3 momentum);
+  void recordExpectedMomentum(Vec3 expectedMomentum);
+  void recordTotalAngularMomentum(Vec3 angularMomentum);
+
+  void recordField(const std::vector<Particle>& particles, float H, float DT);
+
+  std::string flush();
+
  private:
+  void saveIfLimitHit(std::ofstream& of, std::string& str, int& counter);
+
   std::string positionsStr;
   std::string energyStr;
   std::string momentumStr;
@@ -43,24 +67,4 @@ class StateRecorder {
 
   int singleBufSize = 50;
   std::unique_ptr<char[]> singleBuf;
-
-  void saveIfLimitHit(std::ofstream& of, std::string& str, int& counter);
-
- public:
-  StateRecorder(const char* positionsPath,
-                const char* energyPath,
-                const char* momentumPath,
-                const char* expectedMomentumPath,
-                const char* angularMomentumPath,
-                const char* fieldPath,
-                int maxRecords = 500);
-  ~StateRecorder();
-  void recordPositions(std::vector<Vec3>::iterator begin, std::vector<Vec3>::iterator end);
-  void recordPositions(const std::vector<Particle>& particles);
-  void recordEnergy(float pe, float ke);
-  void recordTotalMomentum(Vec3 momentum);
-  void recordExpectedMomentum(Vec3 expectedMomentum);
-  void recordTotalAngularMomentum(Vec3 angularMomentum);
-  void recordField(const std::vector<Particle>& particles, float H, float DT);
-  std::string flush();
 };

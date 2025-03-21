@@ -8,20 +8,6 @@
 
 class ChainingMesh {
  public:
-  struct LLNode;
-
- private:
-  int Mx;
-  int My;
-  int Mz;
-  float HCx;
-  float HCy;
-  float HCz;
-  int size;
-  std::vector<LLNode*> hoc;
-  std::unique_ptr<LLNode[]> nodePool;
-
- public:
   struct LLNode {
     int particleId;
     LLNode* next;
@@ -35,14 +21,23 @@ class ChainingMesh {
 
   std::array<int, 14> getNeighborsAndSelf(int cellIdx) const;
 
-  LLNode* getParticlesInCell(int cellIdx);
-
-  int getSize() const;
-
-  std::tuple<int, int, int> getLength() const;
+  inline LLNode* getParticlesInCell(int cellIdx) { return hoc[cellIdx]; }
+  inline int getSize() const { return size; };
+  inline std::tuple<int, int, int> getLength() const { return std::make_tuple(Mx, My, Mz); }
 
  private:
   int tripleToFlatIndex(int x, int y, int z) const;
+  inline std::tuple<int, int, int> flatToTripleIndex(int idx) const {
+    return std::make_tuple(idx % Mx, (idx / Mx) % My, idx / (Mx * My));
+  };
 
-  std::tuple<int, int, int> flatToTripleIndex(int idx) const;
+  int Mx;
+  int My;
+  int Mz;
+  float HCx;
+  float HCy;
+  float HCz;
+  int size;
+  std::vector<LLNode*> hoc;
+  std::unique_ptr<LLNode[]> nodePool;
 };

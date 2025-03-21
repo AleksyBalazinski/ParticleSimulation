@@ -5,17 +5,8 @@
 
 template <typename T>
 class RK4Stepper : public AbstractStepper<T> {
- private:
   using StateType = std::vector<T>;
   using SystemFunc = std::function<void(StateType&, StateType&, float)>;
-  SystemFunc system;
-  StateType dxdt;
-  float currentT;
-
-  StateType k1;
-  StateType k2;
-  StateType k3;
-  StateType k4;
 
  public:
   RK4Stepper(SystemFunc system, int systemSize, float t0 = 0)
@@ -66,4 +57,13 @@ class RK4Stepper : public AbstractStepper<T> {
 
     return out;
   }
+
+  SystemFunc system;
+  StateType dxdt;
+  float currentT;
+
+  StateType k1;
+  StateType k2;
+  StateType k3;
+  StateType k4;
 };

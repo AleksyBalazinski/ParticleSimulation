@@ -2,15 +2,6 @@
 #include <filesystem>
 #include "unitConversions.h"
 
-void StateRecorder::saveIfLimitHit(std::ofstream& of, std::string& str, int& counter) {
-  if (counter < maxRecords)
-    return;
-
-  of << str;
-  str.clear();
-  counter = 0;
-}
-
 StateRecorder::StateRecorder(const char* positionsPath,
                              const char* energyPath,
                              const char* momentumPath,
@@ -114,4 +105,13 @@ std::string StateRecorder::flush() {
 
   std::filesystem::path cwd = std::filesystem::current_path();
   return cwd.string();
+}
+
+void StateRecorder::saveIfLimitHit(std::ofstream& of, std::string& str, int& counter) {
+  if (counter < maxRecords)
+    return;
+
+  of << str;
+  str.clear();
+  counter = 0;
 }

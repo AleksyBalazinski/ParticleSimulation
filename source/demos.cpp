@@ -143,7 +143,7 @@ void smallSimPP() {
   const int n = 3;
   std::vector<float> masses = {20, 5, 1e2};
   std::vector<Vec3> state = {
-      Vec3(30, 30, 30), Vec3(45, 32, 30),  Vec3(30, 10, 30),  // positions
+      Vec3(30, 30, 15), Vec3(45, 32, 15),  Vec3(30, 10, 15),  // positions
       Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3()             // velocities
   };
 
@@ -172,7 +172,7 @@ void smallSimP3M() {
   const int n = 3;
   std::vector<float> masses = {20, 5, 1e2};
   std::vector<Vec3> state = {
-      Vec3(30, 30, 30), Vec3(45, 32, 30),  Vec3(30, 10, 30),  // positions
+      Vec3(30, 30, 15), Vec3(45, 32, 15),  Vec3(30, 10, 15),  // positions
       Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3()             // velocities
   };
 

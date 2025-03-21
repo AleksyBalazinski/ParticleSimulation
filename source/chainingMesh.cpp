@@ -1,6 +1,8 @@
 #include "chainingMesh.h"
 #include "unitConversions.h"
 
+ChainingMesh::LLNode::LLNode(int particleId, LLNode* next) : particleId(particleId), next(next) {}
+
 ChainingMesh::ChainingMesh(std::tuple<float, float, float> compBoxSize,
                            float cutoffRadius,
                            float H,
@@ -59,27 +61,9 @@ std::array<int, 14> ChainingMesh::getNeighborsAndSelf(int cellIdx) const {
   return neighbors;
 }
 
-ChainingMesh::LLNode* ChainingMesh::getParticlesInCell(int cellIdx) {
-  return hoc[cellIdx];
-}
-
-int ChainingMesh::getSize() const {
-  return size;
-}
-
-std::tuple<int, int, int> ChainingMesh::getLength() const {
-  return std::make_tuple(Mx, My, Mz);
-}
-
 int ChainingMesh::tripleToFlatIndex(int x, int y, int z) const {
   if (x < 0 || y < 0 || z < 0 || x >= Mx || y >= My || z >= Mz) {
     return -1;
   }
   return x + y * Mx + z * Mx * My;
 }
-
-std::tuple<int, int, int> ChainingMesh::flatToTripleIndex(int idx) const {
-  return std::make_tuple(idx % Mx, (idx / Mx) % My, idx / (Mx * My));
-}
-
-ChainingMesh::LLNode::LLNode(int particleId, LLNode* next) : particleId(particleId), next(next) {}

@@ -9,12 +9,6 @@ template <typename T>
 class PocketfftAdapter : public FFTAdapter<T> {
   using CpxT = std::complex<T>;
 
- private:
-  pocketfft::shape_t shape;
-  pocketfft::stride_t stride;
-  pocketfft::shape_t axes;
-  int length;
-
  public:
   PocketfftAdapter(int* dims, int ndim)  // TODO generalize to other than 3D
       : shape(dims, dims + ndim),
@@ -40,4 +34,10 @@ class PocketfftAdapter : public FFTAdapter<T> {
                   [length = static_cast<T>(length)](CpxT& x) { x /= length; });
     return out;
   }
+
+ private:
+  pocketfft::shape_t shape;
+  pocketfft::stride_t stride;
+  pocketfft::shape_t axes;
+  int length;
 };

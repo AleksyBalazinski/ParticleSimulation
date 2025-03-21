@@ -8,28 +8,6 @@
 #include "vec3.h"
 
 class Grid {
- private:
-  int gridPointsX;
-  int gridPointsY;
-  int gridPointsZ;
-  int length;
-  std::vector<Vec3> field;
-
-  long mod(long a, long b) const { return (a % b + b) % b; }
-
-  long getWrappedIndx(int i, int j, int k) const;
-
-  long getIndx(int i, int j, int k) const;
-
-  std::vector<std::complex<float>> density;
-  std::vector<std::mutex> densityMutexes;
-  std::vector<std::complex<float>> densityFourier;
-  std::vector<std::complex<float>> potential;
-  std::vector<std::complex<float>> potentialFourier;
-  std::vector<std::complex<float>> greensFunction;
-
-  FFTAdapter<float>& fftAdapter;
-
  public:
   Grid(std::tuple<int, int, int> gridPoints, FFTAdapter<float>& fftAdapter);
 
@@ -64,4 +42,26 @@ class Grid {
   std::complex<float> getGreensFunction(int i, int j, int k) const;
 
   void setGreensFunction(int i, int j, int k, std::complex<float> value);
+
+ private:
+  inline int mod(int a, int b) const { return (a % b + b) % b; }
+  int getWrappedIndx(int i, int j, int k) const;
+  inline int getIndx(int i, int j, int k) const {
+    return i + j * gridPointsX + k * gridPointsX * gridPointsY;
+  }
+
+  int gridPointsX;
+  int gridPointsY;
+  int gridPointsZ;
+  int length;
+
+  std::vector<Vec3> field;
+  std::vector<std::complex<float>> density;
+  std::vector<std::mutex> densityMutexes;
+  std::vector<std::complex<float>> densityFourier;
+  std::vector<std::complex<float>> potential;
+  std::vector<std::complex<float>> potentialFourier;
+  std::vector<std::complex<float>> greensFunction;
+
+  FFTAdapter<float>& fftAdapter;
 };
