@@ -59,6 +59,7 @@ class PMMethod {
                   const char* energyPath = "energy.txt",
                   const char* momentumPath = "momentum.txt",
                   const char* expectedMomentumPath = "expected_momentum.txt",
+                  const char* angularMomentumPath = "angular_momentum.txt",
                   const char* fieldPath = "field.txt");
 
   std::vector<Particle>& getParticles();

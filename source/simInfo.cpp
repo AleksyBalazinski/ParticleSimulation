@@ -130,6 +130,15 @@ Vec3 SimInfo::totalMomentum(const std::vector<Particle>& particles) {
   return momentum;
 }
 
+Vec3 SimInfo::totalAngularMomentum(const std::vector<Particle>& particles) {
+  Vec3 angularMomentum;
+  for (const auto& p : particles) {
+    angularMomentum += p.mass * p.position.cross(p.integerStepVelocity);
+  }
+
+  return angularMomentum;
+}
+
 void SimInfo::setInitialMomentum(const std::vector<Particle>& particles) {
   expectedMomentum = totalMomentum(particles);
 }

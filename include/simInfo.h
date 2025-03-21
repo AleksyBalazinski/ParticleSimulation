@@ -44,6 +44,8 @@ class SimInfo {
 
   static Vec3 totalMomentum(const std::vector<Particle>& particles);
 
+  static Vec3 totalAngularMomentum(const std::vector<Particle>& particles);
+
   void setInitialMomentum(const std::vector<Particle>& particles);
 
   Vec3 updateExpectedMomentum(Vec3 externalForce, float DT);

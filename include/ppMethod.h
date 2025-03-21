@@ -19,4 +19,5 @@ std::string ppMethodLeapfrog(const std::vector<Vec3>& state,
                              const float G,
                              const char* positionsPath = "output.txt",
                              const char* energyPath = "energy.txt",
-                             const char* momentumPath = "momentum.txt");
+                             const char* momentumPath = "momentum.txt",
+                             const char* angularMomentumPath = "angular_momentum.txt");

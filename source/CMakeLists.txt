@@ -16,6 +16,7 @@
 	chainingMesh.cpp
 	p3mMethod.cpp
 	greensFunctions.cpp
+	demos.cpp
 )
 
 target_include_directories(ParticleSimulation

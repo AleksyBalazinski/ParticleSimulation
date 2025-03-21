@@ -78,10 +78,10 @@ void P3MMethod::run(const int simLength,
                     const char* energyPath,
                     const char* momentumPath,
                     const char* expectedMomentumPath,
-                    const char* fieldPath) {
+                    const char* angularMomentumPath) {
   std::vector<Particle>& particles = pmMethod.getParticles();
   StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath,
-                              fieldPath);
+                              angularMomentumPath, "");
   float H = pmMethod.getH();
   float DT = pmMethod.getDT();
   float G = pmMethod.getG();
@@ -121,6 +121,7 @@ void P3MMethod::run(const int simLength,
           simInfo.updateExpectedMomentum(pmMethod.totalExternalForceOrigUnits(), DT);
       stateRecorder.recordExpectedMomentum(expectedMomentum);
       stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
+      stateRecorder.recordTotalAngularMomentum(SimInfo::totalAngularMomentum(particles));
       auto pe = SimInfo::potentialEnergy(pmMethod.getGrid(), particles,
                                          pmMethod.getExternalPotential(), H, DT, G);
       auto ke = SimInfo::kineticEnergy(particles);

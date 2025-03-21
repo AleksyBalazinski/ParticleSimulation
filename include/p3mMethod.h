@@ -35,7 +35,7 @@ class P3MMethod {
            const char* energyPath = "energy.txt",
            const char* momentumPath = "momentum.txt",
            const char* expectedMomentumPath = "expected_momentum.txt",
-           const char* fieldPath = "field.txt");
+           const char* angularMomentumPath = "angular_momentum.txt");
 
  private:
   void calculateShortRangeForces(std::vector<Particle>& particles);

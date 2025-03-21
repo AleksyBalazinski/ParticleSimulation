@@ -328,9 +328,10 @@ std::string PMMethod::run(const int simLength,
                           const char* energyPath,
                           const char* momentumPath,
                           const char* expectedMomentumPath,
+                          const char* angularMomentumPath,
                           const char* fieldPath) {
   StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath,
-                              fieldPath);
+                              angularMomentumPath, fieldPath);
   SimInfo simInfo;
 
   if (collectDiagnostics) {
@@ -363,6 +364,7 @@ std::string PMMethod::run(const int simLength,
       auto expectedMomentum = simInfo.updateExpectedMomentum(totalExternalForceOrigUnits(), DT);
       stateRecorder.recordExpectedMomentum(expectedMomentum);
       stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
+      stateRecorder.recordTotalAngularMomentum(SimInfo::totalAngularMomentum(particles));
       auto pe = SimInfo::potentialEnergy(grid, particles, externalPotential, H, DT, G);
       auto ke = SimInfo::kineticEnergy(particles);
       stateRecorder.recordEnergy(pe, ke);
