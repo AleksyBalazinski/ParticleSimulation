@@ -1,6 +1,5 @@
 #include "p3mMethod.h"
 #include <algorithm>
-#include <cassert>
 #include <cmath>
 #include <execution>
 #include <iostream>
@@ -12,8 +11,13 @@
 #include "measureTime.h"
 #include "unitConversions.h"
 
+declareTimeAcc(chainingMeshSetup);
+declareTimeAcc(shortRangeForcesCalc);
+declareTimeAcc(pmStep);
+declareTimeAcc(correctAccelerations);
+
 P3MMethod::P3MMethod(PMMethod& pmMethod,
-                     float compBoxSize,
+                     std::tuple<float, float, float> compBoxSize,
                      float cutoffRadius,
                      float particleDiameter,
                      float H,
@@ -26,39 +30,13 @@ P3MMethod::P3MMethod(PMMethod& pmMethod,
       particleDiameter(lengthToCodeUnits(particleDiameter, H)),
       softeningLength(lengthToCodeUnits(softeningLength, H)),
       useSRForceTable(useSRForceTable),
-      cloudShape(cloudShape) {
+      cloudShape(cloudShape),
+      threadTimes(std::thread::hardware_concurrency(), 0.0f) {
   this->tabulatedValuesCnt = 500;
   float re = this->cutoffRadius;
   this->deltaSquared = re * re / (this->tabulatedValuesCnt - 1);
   if (useSRForceTable) {
     initSRForceTable();
-  }
-}
-
-declareTimeAcc(chainingMeshSetup);
-declareTimeAcc(shortRangeForcesCalc);
-declareTimeAcc(pmStep);
-declareTimeAcc(correctAccelerations);
-
-void P3MMethod::calculateShortRangeForces(std::vector<Particle>& particles) {
-  const int maxThreads = std::thread::hardware_concurrency();
-  std::for_each(std::execution::par, particles.begin(), particles.end(), [](Particle& p) {
-    p.shortRangeForce = Vec3();
-    for (auto& srForceNeighbor : p.shortRangeFromNeighbor) {
-      srForceNeighbor = Vec3();
-    }
-  });
-
-  measureTime(chainingMeshSetup, chainingMesh.fillWithYSorting(particles));
-
-  std::vector<std::thread> smallCellThreads;
-  for (int tid = 0; tid < maxThreads; ++tid) {
-    smallCellThreads.emplace_back(&P3MMethod::updateSRForcesThreadJob, this, tid, maxThreads,
-                                  std::ref(particles));
-  }
-
-  for (auto& t : smallCellThreads) {
-    t.join();
   }
 }
 
@@ -77,10 +55,10 @@ void P3MMethod::run(const int simLength,
                     const char* energyPath,
                     const char* momentumPath,
                     const char* expectedMomentumPath,
-                    const char* fieldPath) {
+                    const char* angularMomentumPath) {
   std::vector<Particle>& particles = pmMethod.getParticles();
   StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath,
-                              fieldPath);
+                              angularMomentumPath, "");
   float H = pmMethod.getH();
   float DT = pmMethod.getDT();
   float G = pmMethod.getG();
@@ -120,6 +98,7 @@ void P3MMethod::run(const int simLength,
           simInfo.updateExpectedMomentum(pmMethod.totalExternalForceOrigUnits(), DT);
       stateRecorder.recordExpectedMomentum(expectedMomentum);
       stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
+      stateRecorder.recordTotalAngularMomentum(SimInfo::totalAngularMomentum(particles));
       auto pe = SimInfo::potentialEnergy(pmMethod.getGrid(), particles,
                                          pmMethod.getExternalPotential(), H, DT, G);
       auto ke = SimInfo::kineticEnergy(particles);
@@ -149,7 +128,33 @@ void P3MMethod::run(const int simLength,
   printTime(pmStep);
   printTime(correctAccelerations);
 
+  for (int i = 0; i < 12; ++i) {
+    std::cout << "thread " << i << " was working for " << threadTimes[i] << " ms\n";
+  }
+
   stateRecorder.flush();
+}
+
+void P3MMethod::calculateShortRangeForces(std::vector<Particle>& particles) {
+  const int maxThreads = std::thread::hardware_concurrency();
+  std::for_each(std::execution::par, particles.begin(), particles.end(), [](Particle& p) {
+    p.shortRangeForce = Vec3();
+    for (auto& srForceNeighbor : p.shortRangeFromNeighbor) {
+      srForceNeighbor = Vec3();
+    }
+  });
+
+  measureTime(chainingMeshSetup, chainingMesh.fillWithYSorting(particles));
+
+  std::vector<std::thread> smallCellThreads;
+  for (int tid = 0; tid < maxThreads; ++tid) {
+    smallCellThreads.emplace_back(&P3MMethod::updateSRForcesThreadJob, this, tid, maxThreads,
+                                  std::ref(particles));
+  }
+
+  for (auto& t : smallCellThreads) {
+    t.join();
+  }
 }
 
 float P3MMethod::referenceForceS1(float r, float a) {
@@ -254,6 +259,7 @@ void P3MMethod::initSRForceTable() {
 }
 
 void P3MMethod::updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Particle>& particles) {
+  auto start = std::chrono::steady_clock::now();
   for (int q = tid; q < chainingMesh.getSize(); q += threadsCnt) {
     auto neighbors = chainingMesh.getNeighborsAndSelf(q);
     for (int i = 0; i < neighbors.size(); ++i) {
@@ -274,4 +280,7 @@ void P3MMethod::updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Par
       }
     }
   }
+  auto end = std::chrono::steady_clock::now();
+  auto elapsedMilliSeconds = (end - start).count() * 1e-6f;
+  threadTimes[tid] += elapsedMilliSeconds;
 }

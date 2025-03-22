@@ -14,6 +14,8 @@ class Vec3 {
 
   Vec3& operator+=(const Vec3 other);
 
+  Vec3 cross(const Vec3 other) const;
+
   float getMagnitude() const;
 
   float getMagnitudeSquared() const;

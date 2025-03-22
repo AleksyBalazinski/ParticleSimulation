@@ -9,11 +9,6 @@ template <typename T>
 class KissFFTAdapter : public FFTAdapter<T> {
   using CpxT = std::complex<T>;
 
- private:
-  kiss_fftnd_cfg cfg;
-  kiss_fftnd_cfg cfgInv;
-  int length;
-
  public:
   KissFFTAdapter(int* dims, int ndims);
   ~KissFFTAdapter();
@@ -32,6 +27,11 @@ class KissFFTAdapter : public FFTAdapter<T> {
                   [length = static_cast<T>(length)](CpxT& x) { x /= length; });
     return out;
   }
+
+ private:
+  kiss_fftnd_cfg cfg;
+  kiss_fftnd_cfg cfgInv;
+  int length;
 };
 
 template <typename T>

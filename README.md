@@ -1,5 +1,5 @@
 # ParticleSimulation
-Implementation of the [particle-mesh method](https://www.cs.cmu.edu/afs/cs/academic/class/15850c-s96/www/nbody.html#pm).
+Implementation of the [particle-mesh](https://www.cs.cmu.edu/afs/cs/academic/class/15850c-s96/www/nbody.html#pm) and [particle-particle particle-mesh](https://www.cs.cmu.edu/afs/cs/academic/class/15850c-s96/www/nbody.html#p3m) methods.
 
 ## Build
 ```bash

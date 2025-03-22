@@ -17,94 +17,6 @@
 #include "unitConversions.h"
 #include "vec3.h"
 
-bool isWithingBox(const Vec3& pos, float boxSize) {
-  return pos.x >= 0 && pos.x <= boxSize && pos.y >= 0 && pos.y <= boxSize && pos.z >= 0 &&
-         pos.z <= boxSize;
-}
-
-Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, Grid& grid) {
-  float fieldX, fieldY, fieldZ;
-
-  if (fds == FiniteDiffScheme::TWO_POINT) {
-    fieldX = -0.5f * (grid.getPotential(x + 1, y, z) - grid.getPotential(x - 1, y, z));
-    fieldY = -0.5f * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
-    fieldZ = -0.5f * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
-  } else if (fds == FiniteDiffScheme::FOUR_POINT) {
-    float alpha = 4.0f / 3;
-    fieldX = (-1.0f / 12) * (-grid.getPotential(x + 2, y, z) + 8 * grid.getPotential(x + 1, y, z) -
-                             8 * grid.getPotential(x - 1, y, z) + grid.getPotential(x - 2, y, z));
-    fieldY = (-1.0f / 12) * (-grid.getPotential(x, y + 2, z) + 8 * grid.getPotential(x, y + 1, z) -
-                             8 * grid.getPotential(x, y - 1, z) + grid.getPotential(x, y - 2, z));
-    fieldZ = (-1.0f / 12) * (-grid.getPotential(x, y, z + 2) + 8 * grid.getPotential(x, y, z + 1) -
-                             8 * grid.getPotential(x, y, z - 1) + grid.getPotential(x, y, z - 2));
-  } else {
-    throw std::invalid_argument("Unknown finite difference type.");
-  }
-
-  return Vec3(fieldX, fieldY, fieldZ);
-}
-
-void PMMethod::findFourierPotential() {
-  int dim = grid.getGridPoints();
-  grid.setPotentialFourier(0, 0, 0, std::complex<float>(0, 0));
-  auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
-  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dim, this](int idx) {
-    auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
-
-    auto densityFourier = grid.getDensityFourier(kx, ky, kz);
-    auto potentialFourier = densityFourier * grid.getGreensFunction(kx, ky, kz);
-    grid.setPotentialFourier(kx, ky, kz, potentialFourier);
-  });
-}
-
-void PMMethod::findFieldInCells() {
-  auto gridRange = std::ranges::views::iota(0, grid.getLength());
-  std::for_each(std::execution::par_unseq, gridRange.begin(), gridRange.end(), [this](int idx) {
-    auto [x, y, z] = grid.indexTripleFromFlat(idx);
-    auto [fieldX, fieldY, fieldZ] = getFieldInCell(x, y, z, fds, grid);
-
-    Vec3 fieldStrength(fieldX, fieldY, fieldZ);
-    grid.assignField(x, y, z, fieldStrength);
-  });
-}
-
-void PMMethod::updateAccelerations() {
-  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(), [this](Particle& p) {
-    p.acceleration =
-        interpolateField(p.position) +
-        accelerationToCodeUnits(externalField(positionToOriginalUnits(p.position, H)), H, DT);
-  });
-}
-
-void PMMethod::initGreensFunction() {
-  int dim = grid.getGridPoints();
-  auto gridRange = std::ranges::views::iota(0, dim * dim * dim);
-  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dim, this](int idx) {
-    auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
-
-    std::complex<float> G;
-    if (gFunc == GreensFunction::DISCRETE_LAPLACIAN) {
-      G = GreenDiscreteLaplacian(kx, ky, kz, dim);
-    } else if (gFunc == GreensFunction::S1_OPTIMAL) {
-      if (is == InterpolationScheme::TSC) {
-        G = GreenOptimalTSC(kx, ky, kz, dim, particleDiameter, CloudShape::S1, fds);
-      } else {
-        throw std::invalid_argument("not implemented");
-      }
-    } else if (gFunc == GreensFunction::S2_OPTIMAL) {
-      if (is == InterpolationScheme::TSC) {
-        G = GreenOptimalTSC(kx, ky, kz, dim, particleDiameter, CloudShape::S2, fds);
-      } else {
-        throw std::invalid_argument("not implemented");
-      }
-    } else {
-      throw std::invalid_argument("not implemented");
-    }
-
-    grid.setGreensFunction(kx, ky, kz, G);
-  });
-}
-
 declareTimeAcc(spreadMass);
 declareTimeAcc(forwardFFT);
 declareTimeAcc(fourierPotential);
@@ -112,6 +24,116 @@ declareTimeAcc(inverseFFT);
 declareTimeAcc(fieldInCells);
 declareTimeAcc(updateAccelerations);
 declareTimeAcc(recordPositions);
+
+PMMethod::PMMethod(const std::vector<Vec3>& state,
+                   const std::vector<float>& masses,
+                   const std::tuple<float, float, float> effectiveBoxSize,
+                   const std::function<Vec3(Vec3)> externalField,
+                   const std::function<float(Vec3)> externalPotential,
+                   const float H,
+                   const float DT,
+                   const float G,
+                   const InterpolationScheme is,
+                   const FiniteDiffScheme fds,
+                   const GreensFunction gFunc,
+                   const float particleDiameter,
+                   Grid& grid)
+    : grid(grid),
+      effectiveBoxSizeX(std::get<0>(effectiveBoxSize)),
+      effectiveBoxSizeY(std::get<1>(effectiveBoxSize)),
+      effectiveBoxSizeZ(std::get<2>(effectiveBoxSize)),
+      externalField(externalField),
+      externalPotential(externalPotential),
+      H(H),
+      DT(DT),
+      G(G),
+      is(is),
+      fds(fds),
+      gFunc(gFunc),
+      particleDiameter(lengthToCodeUnits(particleDiameter, H)) {
+  this->N = static_cast<int>(masses.size());
+  for (int i = 0; i < N; ++i) {
+    this->particles.emplace_back(state[i], state[N + i], masses[i]);
+  }
+}
+
+std::string PMMethod::run(const int simLength,
+                          bool collectDiagnostics,
+                          bool recordField,
+                          const char* positionsPath,
+                          const char* energyPath,
+                          const char* momentumPath,
+                          const char* expectedMomentumPath,
+                          const char* angularMomentumPath,
+                          const char* fieldPath) {
+  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath,
+                              angularMomentumPath, fieldPath);
+  SimInfo simInfo;
+
+  if (collectDiagnostics) {
+    simInfo.setInitialMomentum(particles);
+  }
+
+  stateToCodeUnits(particles, H, DT);
+  massToCodeUnits(particles, H, DT, G);
+  initGreensFunction();
+  pmMethodStep();
+
+  setHalfStepVelocities(particles);
+
+  for (int t = 0; t <= simLength; ++t) {
+    std::cout << "progress: " << float(t) / simLength << '\r';
+    std::cout.flush();
+
+    updatePositions(particles);
+
+    if (collectDiagnostics) {
+      setIntegerStepVelocities(particles);
+      integerStepVelocitiesToOriginalUnits(particles, H, DT);
+    }
+
+    stateToOriginalUnits(particles, H, DT);
+
+    measureTime(recordPositions, stateRecorder.recordPositions(particles));
+    if (collectDiagnostics) {
+      massToOriginalUnits(particles, H, DT, G);
+      auto expectedMomentum = simInfo.updateExpectedMomentum(totalExternalForceOrigUnits(), DT);
+      stateRecorder.recordExpectedMomentum(expectedMomentum);
+      stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
+      stateRecorder.recordTotalAngularMomentum(SimInfo::totalAngularMomentum(particles));
+      auto pe = SimInfo::potentialEnergy(grid, particles, externalPotential, H, DT, G);
+      auto ke = SimInfo::kineticEnergy(particles);
+      stateRecorder.recordEnergy(pe, ke);
+    }
+    if (recordField) {
+      stateRecorder.recordField(particles, H, DT);
+    }
+    if (escapedComputationalBox()) {
+      std::cout << "Particle moved outside the computational box.\n";
+      break;
+    }
+
+    stateToCodeUnits(particles, H, DT);
+    if (collectDiagnostics) {
+      massToCodeUnits(particles, H, DT, G);
+      integerStepVelocitiesToCodeUnits(particles, H, DT);
+    }
+
+    pmMethodStep();
+
+    updateVelocities(particles);
+  }
+
+  printTime(spreadMass);
+  printTime(forwardFFT);
+  printTime(fourierPotential);
+  printTime(inverseFFT);
+  printTime(fieldInCells);
+  printTime(updateAccelerations);
+  printTime(recordPositions);
+
+  return stateRecorder.flush();
+}
 
 void PMMethod::pmMethodStep() {
   measureTime(spreadMass, spreadMass());
@@ -122,10 +144,16 @@ void PMMethod::pmMethodStep() {
   measureTime(updateAccelerations, updateAccelerations());
 }
 
+bool isWithingBox(const Vec3& pos, float boxSizeX, float boxSizeY, float boxSizeZ) {
+  return pos.x >= 0 && pos.x <= boxSizeX && pos.y >= 0 && pos.y <= boxSizeY && pos.z >= 0 &&
+         pos.z <= boxSizeZ;
+}
+
 bool PMMethod::escapedComputationalBox() {
   return std::any_of(
-      std::execution::par_unseq, particles.begin(), particles.end(),
-      [this](const Particle& p) { return !isWithingBox(p.position, effectiveBoxSize); });
+      std::execution::par_unseq, particles.begin(), particles.end(), [this](const Particle& p) {
+        return !isWithingBox(p.position, effectiveBoxSizeX, effectiveBoxSizeY, effectiveBoxSizeZ);
+      });
 }
 
 Vec3 PMMethod::totalExternalForceOrigUnits() {
@@ -134,6 +162,35 @@ Vec3 PMMethod::totalExternalForceOrigUnits() {
                 [this, &f](const Particle& p) { f += p.mass * externalField(p.position); });
 
   return f;
+}
+
+void PMMethod::initGreensFunction() {
+  auto dims = grid.getGridPoints();
+  auto gridRange = std::ranges::views::iota(0, grid.getLength());
+  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [dims, this](int idx) {
+    auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
+
+    std::complex<float> G;
+    if (gFunc == GreensFunction::DISCRETE_LAPLACIAN) {
+      G = GreenDiscreteLaplacian(kx, ky, kz, dims);
+    } else if (gFunc == GreensFunction::S1_OPTIMAL) {
+      if (is == InterpolationScheme::TSC) {
+        G = GreenOptimalTSC(kx, ky, kz, dims, particleDiameter, CloudShape::S1, fds);
+      } else {
+        throw std::invalid_argument("not implemented");
+      }
+    } else if (gFunc == GreensFunction::S2_OPTIMAL) {
+      if (is == InterpolationScheme::TSC) {
+        G = GreenOptimalTSC(kx, ky, kz, dims, particleDiameter, CloudShape::S2, fds);
+      } else {
+        throw std::invalid_argument("not implemented");
+      }
+    } else {
+      throw std::invalid_argument("not implemented");
+    }
+
+    grid.setGreensFunction(kx, ky, kz, G);
+  });
 }
 
 float TSCAssignmentFunc(float x, int t) {
@@ -289,132 +346,55 @@ Vec3 PMMethod::interpolateField(Vec3 position) {
   }
 }
 
-PMMethod::PMMethod(const std::vector<Vec3>& state,
-                   const std::vector<float>& masses,
-                   const float effectiveBoxSize,
-                   const std::function<Vec3(Vec3)> externalField,
-                   const std::function<float(Vec3)> externalPotential,
-                   const float H,
-                   const float DT,
-                   const float G,
-                   const InterpolationScheme is,
-                   const FiniteDiffScheme fds,
-                   const GreensFunction gFunc,
-                   const float particleDiameter,
-                   Grid& grid)
-    : effectiveBoxSize(effectiveBoxSize),
-      externalField(externalField),
-      externalPotential(externalPotential),
-      H(H),
-      DT(DT),
-      G(G),
-      is(is),
-      fds(fds),
-      gFunc(gFunc),
-      particleDiameter(lengthToCodeUnits(particleDiameter, H)),
-      grid(grid) {
-  this->N = static_cast<int>(masses.size());
-  for (int i = 0; i < N; ++i) {
-    this->particles.emplace_back(state[i], state[N + i], masses[i]);
-  }
+void PMMethod::findFourierPotential() {
+  grid.setPotentialFourier(0, 0, 0, std::complex<float>(0, 0));
+  auto gridRange = std::ranges::views::iota(0, grid.getLength());
+  std::for_each(std::execution::par, gridRange.begin(), gridRange.end(), [this](int idx) {
+    auto [kx, ky, kz] = grid.indexTripleFromFlat(idx);
+
+    auto densityFourier = grid.getDensityFourier(kx, ky, kz);
+    auto potentialFourier = densityFourier * grid.getGreensFunction(kx, ky, kz);
+    grid.setPotentialFourier(kx, ky, kz, potentialFourier);
+  });
 }
 
-std::string PMMethod::run(const int simLength,
-                          bool collectDiagnostics,
-                          bool recordField,
-                          const char* positionsPath,
-                          const char* energyPath,
-                          const char* momentumPath,
-                          const char* expectedMomentumPath,
-                          const char* fieldPath) {
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath,
-                              fieldPath);
-  SimInfo simInfo;
+Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, Grid& grid) {
+  float fieldX, fieldY, fieldZ;
 
-  if (collectDiagnostics) {
-    simInfo.setInitialMomentum(particles);
+  if (fds == FiniteDiffScheme::TWO_POINT) {
+    fieldX = -0.5f * (grid.getPotential(x + 1, y, z) - grid.getPotential(x - 1, y, z));
+    fieldY = -0.5f * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
+    fieldZ = -0.5f * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
+  } else if (fds == FiniteDiffScheme::FOUR_POINT) {
+    float alpha = 4.0f / 3;
+    fieldX = (-1.0f / 12) * (-grid.getPotential(x + 2, y, z) + 8 * grid.getPotential(x + 1, y, z) -
+                             8 * grid.getPotential(x - 1, y, z) + grid.getPotential(x - 2, y, z));
+    fieldY = (-1.0f / 12) * (-grid.getPotential(x, y + 2, z) + 8 * grid.getPotential(x, y + 1, z) -
+                             8 * grid.getPotential(x, y - 1, z) + grid.getPotential(x, y - 2, z));
+    fieldZ = (-1.0f / 12) * (-grid.getPotential(x, y, z + 2) + 8 * grid.getPotential(x, y, z + 1) -
+                             8 * grid.getPotential(x, y, z - 1) + grid.getPotential(x, y, z - 2));
+  } else {
+    throw std::invalid_argument("Unknown finite difference type.");
   }
 
-  stateToCodeUnits(particles, H, DT);
-  massToCodeUnits(particles, H, DT, G);
-  initGreensFunction();
-  pmMethodStep();
-
-  setHalfStepVelocities(particles);
-
-  for (int t = 0; t <= simLength; ++t) {
-    std::cout << "progress: " << float(t) / simLength << '\r';
-    std::cout.flush();
-
-    updatePositions(particles);
-
-    if (collectDiagnostics) {
-      setIntegerStepVelocities(particles);
-      integerStepVelocitiesToOriginalUnits(particles, H, DT);
-    }
-
-    stateToOriginalUnits(particles, H, DT);
-
-    measureTime(recordPositions, stateRecorder.recordPositions(particles));
-    if (collectDiagnostics) {
-      massToOriginalUnits(particles, H, DT, G);
-      auto expectedMomentum = simInfo.updateExpectedMomentum(totalExternalForceOrigUnits(), DT);
-      stateRecorder.recordExpectedMomentum(expectedMomentum);
-      stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
-      auto pe = SimInfo::potentialEnergy(grid, particles, externalPotential, H, DT, G);
-      auto ke = SimInfo::kineticEnergy(particles);
-      stateRecorder.recordEnergy(pe, ke);
-    }
-    if (recordField) {
-      stateRecorder.recordField(particles, H, DT);
-    }
-    if (escapedComputationalBox()) {
-      std::cout << "Particle moved outside the computational box.\n";
-      break;
-    }
-
-    stateToCodeUnits(particles, H, DT);
-    if (collectDiagnostics) {
-      massToCodeUnits(particles, H, DT, G);
-      integerStepVelocitiesToCodeUnits(particles, H, DT);
-    }
-
-    pmMethodStep();
-
-    updateVelocities(particles);
-  }
-
-  printTime(spreadMass);
-  printTime(forwardFFT);
-  printTime(fourierPotential);
-  printTime(inverseFFT);
-  printTime(fieldInCells);
-  printTime(updateAccelerations);
-  printTime(recordPositions);
-
-  return stateRecorder.flush();
+  return Vec3(fieldX, fieldY, fieldZ);
 }
 
-std::vector<Particle>& PMMethod::getParticles() {
-  return particles;
+void PMMethod::findFieldInCells() {
+  auto gridRange = std::ranges::views::iota(0, grid.getLength());
+  std::for_each(std::execution::par_unseq, gridRange.begin(), gridRange.end(), [this](int idx) {
+    auto [x, y, z] = grid.indexTripleFromFlat(idx);
+    auto [fieldX, fieldY, fieldZ] = getFieldInCell(x, y, z, fds, grid);
+
+    Vec3 fieldStrength(fieldX, fieldY, fieldZ);
+    grid.assignField(x, y, z, fieldStrength);
+  });
 }
 
-float PMMethod::getH() const {
-  return H;
-}
-
-float PMMethod::getDT() const {
-  return DT;
-}
-
-float PMMethod::getG() const {
-  return G;
-}
-
-const Grid& PMMethod::getGrid() const {
-  return grid;
-}
-
-std::function<float(Vec3)> PMMethod::getExternalPotential() const {
-  return externalPotential;
+void PMMethod::updateAccelerations() {
+  std::for_each(std::execution::par_unseq, particles.begin(), particles.end(), [this](Particle& p) {
+    p.acceleration =
+        interpolateField(p.position) +
+        accelerationToCodeUnits(externalField(positionToOriginalUnits(p.position, H)), H, DT);
+  });
 }

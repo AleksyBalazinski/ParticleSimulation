@@ -59,6 +59,17 @@ std::array<std::complex<float>, 3> D2Fourier(std::array<float, 3> k) {
   return D;
 }
 
+std::array<std::complex<float>, 3> D4Fourier(std::array<float, 3> k) {
+  std::array<std::complex<float>, 3> D;
+  std::complex<float> I(0, 1);
+  float alpha = 4.0f / 3;
+  for (int i = 0; i < 3; i++) {
+    D[i] = I * alpha * std::sinf(k[i]) + I * (1 - alpha) * std::sinf(2 * k[i]) / 2.0f;
+  }
+
+  return D;
+}
+
 std::complex<float> dotProduct(std::array<std::complex<float>, 3> a,
                                std::array<std::complex<float>, 3> b) {
   std::complex<float> dot(0, 0);
@@ -78,20 +89,28 @@ float TSCAliasSum(std::array<float, 3> k) {
   return sum;
 }
 
-std::complex<float>
-GreenOptimalTSC(int kx, int ky, int kz, int dim, float a, CloudShape cs, FiniteDiffScheme fds) {
+std::complex<float> GreenOptimalTSC(int kx,
+                                    int ky,
+                                    int kz,
+                                    std::tuple<int, int, int> dims,
+                                    float a,
+                                    CloudShape cs,
+                                    FiniteDiffScheme fds) {
   if (kx == 0 && ky == 0 && kz == 0) {
     return 0;
   }
 
-  std::array<float, 3> k = {2 * pi * float(kx) / dim, 2 * pi * float(ky) / dim,
-                            2 * pi * float(kz) / dim};
+  std::array<float, 3> k = {2 * pi * float(kx) / std::get<0>(dims),
+                            2 * pi * float(ky) / std::get<1>(dims),
+                            2 * pi * float(kz) / std::get<2>(dims)};
 
   float denomSum = TSCAliasSum(k);
 
   std::array<std::complex<float>, 3> D;
   if (fds == FiniteDiffScheme::TWO_POINT) {
     D = D2Fourier(k);
+  } else if (fds == FiniteDiffScheme::FOUR_POINT) {
+    D = D4Fourier(k);
   } else {
     throw std::invalid_argument("not implemented");
   }
@@ -120,13 +139,13 @@ GreenOptimalTSC(int kx, int ky, int kz, int dim, float a, CloudShape cs, FiniteD
   return numerator / denominator;
 }
 
-std::complex<float> GreenDiscreteLaplacian(int kx, int ky, int kz, int dim) {
+std::complex<float> GreenDiscreteLaplacian(int kx, int ky, int kz, std::tuple<int, int, int> dims) {
   if (kx == 0 && ky == 0 && kz == 0) {
     return 0;
   }
 
-  auto sx = std::sinf(pi * kx / dim);
-  auto sy = std::sinf(pi * ky / dim);
-  auto sz = std::sinf(pi * kz / dim);
+  auto sx = std::sinf(pi * kx / std::get<0>(dims));
+  auto sy = std::sinf(pi * ky / std::get<1>(dims));
+  auto sz = std::sinf(pi * kz / std::get<2>(dims));
   return -0.25f / (sx * sx + sy * sy + sz * sz);
 }

@@ -2,31 +2,25 @@
 #include <filesystem>
 #include "unitConversions.h"
 
-void StateRecorder::saveIfLimitHit(std::ofstream& of, std::string& str, int& counter) {
-  if (counter < maxRecords)
-    return;
-
-  of << str;
-  str.clear();
-  counter = 0;
-}
-
 StateRecorder::StateRecorder(const char* positionsPath,
                              const char* energyPath,
                              const char* momentumPath,
                              const char* expectedMomentumPath,
+                             const char* angularMomentumPath,
                              const char* fieldPath,
                              int maxRecords)
     : positionsPath(positionsPath),
       energyPath(energyPath),
       momentumPath(momentumPath),
       expectedMomentumPath(expectedMomentumPath),
+      angularMomentumPath(angularMomentumPath),
       fieldPath(fieldPath),
       maxRecords(maxRecords),
       positionsFile(positionsPath, std::ofstream::trunc),
       energyFile(energyPath, std::ofstream::trunc),
       momentumFile(momentumPath, std::ofstream::trunc),
       expectedMomentumFile(expectedMomentumPath, std::ofstream::trunc),
+      angularMomentumFile(angularMomentumPath, std::ofstream::trunc),
       fieldFile(fieldPath, std::ofstream::trunc),
       vecBuf(new char[vecBufSize]),
       singleBuf(new char[singleBufSize]) {
@@ -82,6 +76,14 @@ void StateRecorder::recordExpectedMomentum(Vec3 expectedMomentum) {
   saveIfLimitHit(expectedMomentumFile, expectedMomentumStr, expectedMomentumRecordsCnt);
 }
 
+void StateRecorder::recordTotalAngularMomentum(Vec3 angularMomentum) {
+  angularMomentumStr +=
+      angularMomentum.toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
+  angularMomentumStr += '\n';
+  ++angularMomentumRecordsCnt;
+  saveIfLimitHit(angularMomentumFile, angularMomentumStr, angularMomentumRecordsCnt);
+}
+
 void StateRecorder::recordField(const std::vector<Particle>& particles, float H, float DT) {
   for (const auto& p : particles) {
     fieldStr += accelerationToOriginalUnits(p.acceleration, H, DT)
@@ -98,8 +100,18 @@ std::string StateRecorder::flush() {
   energyFile << energyStr;
   momentumFile << momentumStr;
   expectedMomentumFile << expectedMomentumStr;
+  angularMomentumFile << angularMomentumStr;
   fieldFile << fieldStr;
 
   std::filesystem::path cwd = std::filesystem::current_path();
   return cwd.string();
+}
+
+void StateRecorder::saveIfLimitHit(std::ofstream& of, std::string& str, int& counter) {
+  if (counter < maxRecords)
+    return;
+
+  of << str;
+  str.clear();
+  counter = 0;
 }

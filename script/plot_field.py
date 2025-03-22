@@ -78,7 +78,7 @@ smoothed_g_x = s1_smoothed_g(r, a)
 fig = plt.figure()
 ax = fig.add_subplot(111)
 ax.set_xlim(min(x), max(x))
-ax.set_ylim(-0.01, 0)
+ax.set_ylim(-0.0005, 0)
 
 
 ax.set_xlabel('x (kpc)')

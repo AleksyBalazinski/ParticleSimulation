@@ -1,10 +1,19 @@
 #include "chainingMesh.h"
 #include "unitConversions.h"
 
-ChainingMesh::ChainingMesh(float compBoxSize, float cutoffRadius, float H, int N)
-    : M(int(compBoxSize / cutoffRadius)),
-      HC(lengthToCodeUnits(compBoxSize / M, H)),
-      size(M * M * M),
+ChainingMesh::LLNode::LLNode(int particleId, LLNode* next) : particleId(particleId), next(next) {}
+
+ChainingMesh::ChainingMesh(std::tuple<float, float, float> compBoxSize,
+                           float cutoffRadius,
+                           float H,
+                           int N)
+    : Mx(int(std::get<0>(compBoxSize) / cutoffRadius)),
+      My(int(std::get<1>(compBoxSize) / cutoffRadius)),
+      Mz(int(std::get<2>(compBoxSize) / cutoffRadius)),
+      HCx(lengthToCodeUnits(std::get<0>(compBoxSize) / Mx, H)),
+      HCy(lengthToCodeUnits(std::get<1>(compBoxSize) / My, H)),
+      HCz(lengthToCodeUnits(std::get<2>(compBoxSize) / Mz, H)),
+      size(Mx * My * Mz),
       hoc(size, nullptr),
       nodePool(new LLNode[N]) {}
 
@@ -13,9 +22,9 @@ void ChainingMesh::fillWithYSorting(const std::vector<Particle>& particles) {
 
   for (int i = 0; i < particles.size(); ++i) {
     const auto& p = particles[i];
-    int cellX = int(p.position.x / HC);
-    int cellY = int(p.position.y / HC);
-    int cellZ = int(p.position.z / HC);
+    int cellX = int(p.position.x / HCx);
+    int cellY = int(p.position.y / HCy);
+    int cellZ = int(p.position.z / HCz);
 
     int cellIdx = tripleToFlatIndex(cellX, cellY, cellZ);
     LLNode* head = hoc[cellIdx];
@@ -52,27 +61,9 @@ std::array<int, 14> ChainingMesh::getNeighborsAndSelf(int cellIdx) const {
   return neighbors;
 }
 
-ChainingMesh::LLNode* ChainingMesh::getParticlesInCell(int cellIdx) {
-  return hoc[cellIdx];
-}
-
-int ChainingMesh::getSize() const {
-  return size;
-}
-
-int ChainingMesh::getLength() const {
-  return M;
-}
-
 int ChainingMesh::tripleToFlatIndex(int x, int y, int z) const {
-  if (x < 0 || y < 0 || z < 0 || x >= M || y >= M || z >= M) {
+  if (x < 0 || y < 0 || z < 0 || x >= Mx || y >= My || z >= Mz) {
     return -1;
   }
-  return x + y * M + z * M * M;
+  return x + y * Mx + z * Mx * My;
 }
-
-std::tuple<int, int, int> ChainingMesh::flatToTripleIndex(int idx) const {
-  return std::make_tuple(idx % M, (idx / M) % M, idx / (M * M));
-}
-
-ChainingMesh::LLNode::LLNode(int particleId, LLNode* next) : particleId(particleId), next(next) {}

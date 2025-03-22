@@ -4,6 +4,34 @@
 #include "externalFields.h"
 #include "utils.h"
 
+DiskSampler::DiskSampler() : re(std::random_device{}()) {}
+
+std::vector<Vec3> DiskSampler::sample(Vec3 center,
+                                      float rb,
+                                      float mb,
+                                      float rd,
+                                      float md,
+                                      float thickness,
+                                      float G,
+                                      int n) {
+  std::uniform_real_distribution<float> u(0, 1);
+  std::vector<Vec3> state(2 * n);
+
+  for (int i = 0; i < n; ++i) {
+    float phi = u(re) * 2 * std::numbers::pi_v<float>;
+    float r = 0.97f * rd * std::sqrtf(u(re));
+
+    float x = r * std::cos(phi);
+    float y = r * std::sin(phi);
+    float z = (thickness / 2) * (2 * u(re) - 1);
+
+    state[i] = center + Vec3(x, y, z);
+    state[n + i] = getVelocity(state[i], center, rb, mb, rd, md, G);
+  }
+
+  return state;
+}
+
 Vec3 DiskSampler::getVelocity(Vec3 pos,
                               Vec3 center,
                               float rb,
@@ -39,32 +67,4 @@ Vec3 DiskSampler::getVelocity(Vec3 pos,
 
   float v = std::sqrt(gVal * rho * rho / r);
   return Vec3(-v * rVec.y / rho, v * rVec.x / rho, 0);
-}
-
-DiskSampler::DiskSampler() : re(std::random_device{}()) {}
-
-std::vector<Vec3> DiskSampler::sample(Vec3 center,
-                                      float rb,
-                                      float mb,
-                                      float rd,
-                                      float md,
-                                      float thickness,
-                                      float G,
-                                      int n) {
-  std::uniform_real_distribution<float> u(0, 1);
-  std::vector<Vec3> state(2 * n);
-
-  for (int i = 0; i < n; ++i) {
-    float phi = u(re) * 2 * std::numbers::pi_v<float>;
-    float r = 0.97f * rd * std::sqrtf(u(re));
-
-    float x = r * std::cos(phi);
-    float y = r * std::sin(phi);
-    float z = (thickness / 2) * (2 * u(re) - 1);
-
-    state[i] = center + Vec3(x, y, z);
-    state[n + i] = getVelocity(state[i], center, rb, mb, rd, md, G);
-  }
-
-  return state;
 }

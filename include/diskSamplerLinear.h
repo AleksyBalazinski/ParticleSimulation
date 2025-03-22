@@ -4,9 +4,13 @@
 #include "vec3.h"
 
 class DiskSamplerLinear {
- private:
-  std::default_random_engine re;
+ public:
+  DiskSamplerLinear();
 
+  std::vector<Vec3>
+  sample(Vec3 center, float rb, float mb, float rd, float md, float thickness, float G, int n);
+
+ private:
   Vec3 getVelocity(Vec3 pos, Vec3 center, float rb, float mb, float rd, float md, float G);
 
   float sampleFromLinear(float rd);
@@ -17,9 +21,5 @@ class DiskSamplerLinear {
 
   inline float implicitInvCDFLinearDer(float r, float rd) { return 6 * r * r - 6 * rd * r; }
 
- public:
-  DiskSamplerLinear();
-
-  std::vector<Vec3>
-  sample(Vec3 center, float rb, float mb, float rd, float md, float thickness, float G, int n);
+  std::default_random_engine re;
 };

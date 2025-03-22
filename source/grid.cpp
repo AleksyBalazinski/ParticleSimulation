@@ -2,17 +2,11 @@
 #include <algorithm>
 #include <complex>
 
-long Grid::getWrappedIndx(int i, int j, int k, int dim) const {
-  return mod(i, dim) + mod(j, dim) * dim + mod(k, dim) * dim * dim;
-}
-
-long Grid::getIndx(int i, int j, int k) const {
-  return i + j * gridPoints + k * gridPoints * gridPoints;
-}
-
-Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
-    : gridPoints(gridPoints),
-      length(gridPoints * gridPoints * gridPoints),
+Grid::Grid(std::tuple<int, int, int> gridPoints, FFTAdapter<float>& fftAdapter)
+    : gridPointsX(std::get<0>(gridPoints)),
+      gridPointsY(std::get<1>(gridPoints)),
+      gridPointsZ(std::get<2>(gridPoints)),
+      length(gridPointsX * gridPointsY * gridPointsZ),
       field(length),
       density(length),
       densityMutexes(length),
@@ -25,9 +19,9 @@ Grid::Grid(int gridPoints, FFTAdapter<float>& fftAdapter)
 }
 
 std::tuple<int, int, int> Grid::indexTripleFromFlat(int flatIndex) const {
-  int x = flatIndex % gridPoints;
-  int y = (flatIndex / gridPoints) % gridPoints;
-  int z = flatIndex / (gridPoints * gridPoints);
+  int x = flatIndex % gridPointsX;
+  int y = (flatIndex / gridPointsX) % gridPointsY;
+  int z = flatIndex / (gridPointsX * gridPointsY);
   return std::make_tuple(x, y, z);
 }
 
@@ -70,7 +64,7 @@ std::complex<float> Grid::getDensityFourier(int i, int j, int k) const {
 }
 
 float Grid::getPotential(int i, int j, int k) const {
-  return potential[getWrappedIndx(i, j, k, gridPoints)].real();
+  return potential[getWrappedIndx(i, j, k)].real();
 }
 
 std::complex<float> Grid::getGreensFunction(int i, int j, int k) const {
@@ -79,4 +73,9 @@ std::complex<float> Grid::getGreensFunction(int i, int j, int k) const {
 
 void Grid::setGreensFunction(int i, int j, int k, std::complex<float> value) {
   greensFunction[getIndx(i, j, k)] = value;
+}
+
+int Grid::getWrappedIndx(int i, int j, int k) const {
+  return mod(i, gridPointsX) + mod(j, gridPointsY) * gridPointsX +
+         mod(k, gridPointsZ) * gridPointsX * gridPointsY;
 }
