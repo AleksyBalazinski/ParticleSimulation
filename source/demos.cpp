@@ -28,7 +28,7 @@ void probeField() {
   const int n = 400;
   const float G = 4.5e-3f;
 
-  std::vector<Vec3> state = linearSpacing(n, 0.075f /*dx*/, Vec3(30, 30, 30) /*center*/);
+  std::vector<Vec3> state = linearSpacing(n, 0.075f /*dx*/, Vec3(30, 30, 15) /*center*/);
 
   std::vector<float> masses(n, 0);
   masses[0] = 1.0f;

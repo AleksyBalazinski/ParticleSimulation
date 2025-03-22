@@ -30,7 +30,8 @@ P3MMethod::P3MMethod(PMMethod& pmMethod,
       particleDiameter(lengthToCodeUnits(particleDiameter, H)),
       softeningLength(lengthToCodeUnits(softeningLength, H)),
       useSRForceTable(useSRForceTable),
-      cloudShape(cloudShape) {
+      cloudShape(cloudShape),
+      threadTimes(std::thread::hardware_concurrency(), 0.0f) {
   this->tabulatedValuesCnt = 500;
   float re = this->cutoffRadius;
   this->deltaSquared = re * re / (this->tabulatedValuesCnt - 1);
@@ -47,8 +48,6 @@ void correctAccelerations(std::vector<Particle>& particles) {
     p.acceleration += totalSRForce / p.mass;
   });
 }
-
-std::array<float, 12> threadTimes;
 
 void P3MMethod::run(const int simLength,
                     bool collectDiagnostics,

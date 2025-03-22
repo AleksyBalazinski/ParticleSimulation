@@ -49,4 +49,5 @@ class P3MMethod {
   const float softeningLength;
   bool useSRForceTable;
   const CloudShape cloudShape;
+  std::vector<float> threadTimes;
 };
