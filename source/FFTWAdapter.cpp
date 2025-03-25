@@ -7,8 +7,8 @@
 
 using CpxT = std::complex<float>;
 
-FFTWAdapter::FFTWAdapter(int* dims, int ndims) {
-  length = std::accumulate(dims, dims + ndims, 1, std::multiplies<int>());
+FFTWAdapter::FFTWAdapter(std::array<int, 3> dims) {
+  length = std::accumulate(dims.begin(), dims.end(), 1, std::multiplies<int>());
   inBuf = (fftwf_complex*)fftwf_malloc(length * sizeof(fftwf_complex));
   outBuf = (fftwf_complex*)fftwf_malloc(length * sizeof(fftwf_complex));
 

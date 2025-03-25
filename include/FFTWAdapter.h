@@ -1,13 +1,14 @@
 #pragma once
 
 #include <fftw3.h>
+#include <array>
 #include "FFTAdapter.h"
 
 class FFTWAdapter : public FFTAdapter<float> {
   using CpxT = std::complex<float>;
 
  public:
-  FFTWAdapter(int* dims, int ndims);
+  FFTWAdapter(std::array<int, 3> dims);
 
   ~FFTWAdapter();
 
