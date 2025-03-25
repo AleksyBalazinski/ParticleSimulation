@@ -1,3 +1,4 @@
+#include "FFTWAdapter.h"
 #include "diskSamplerLinear.h"
 #include "externalFields.h"
 #include "grid.h"
@@ -37,8 +38,9 @@ void probeField() {
   auto externalPotential = [](Vec3 pos) -> float { return 0; };
 
   auto gridPoints = std::make_tuple(64, 64, 32);
-  int dims[] = {std::get<2>(gridPoints), std::get<1>(gridPoints), std::get<0>(gridPoints)};
-  KissFFTAdapter<float> fftAdapter(dims, 3);
+  std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                             std::get<0>(gridPoints)};
+  FFTWAdapter fftAdapter(dims);
   Grid grid(gridPoints, fftAdapter);
   auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
   float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
@@ -79,8 +81,9 @@ void galaxySimulationPM(int n, int simLength) {
   };
 
   auto gridPoints = std::make_tuple(64, 64, 32);
-  int dims[] = {std::get<2>(gridPoints), std::get<1>(gridPoints), std::get<0>(gridPoints)};
-  KissFFTAdapter<float> fftAdapter(dims, 3);
+  std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                             std::get<0>(gridPoints)};
+  FFTWAdapter fftAdapter(dims);
   Grid grid(gridPoints, fftAdapter);
   auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
   float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
@@ -119,9 +122,10 @@ void galaxySimulationP3M(int n, int simLength) {
     return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
   };
 
-  auto gridPoints = std::make_tuple(64, 64, 32);
-  int dims[] = {std::get<2>(gridPoints), std::get<1>(gridPoints), std::get<0>(gridPoints)};
-  KissFFTAdapter<float> fftAdapter(dims, 3);
+  auto gridPoints = std::make_tuple(128, 128, 64);
+  std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                             std::get<0>(gridPoints)};
+  FFTWAdapter fftAdapter(dims);
   Grid grid(gridPoints, fftAdapter);
   auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
   float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
@@ -180,8 +184,9 @@ void smallSimP3M() {
   float G = 4.5e-3f;
 
   auto gridPoints = std::make_tuple(64, 64, 32);
-  int dims[] = {std::get<2>(gridPoints), std::get<1>(gridPoints), std::get<0>(gridPoints)};
-  KissFFTAdapter<float> fftAdapter(dims, 3);
+  std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                             std::get<0>(gridPoints)};
+  FFTWAdapter fftAdapter(dims);
   Grid grid(gridPoints, fftAdapter);
   auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
   float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
