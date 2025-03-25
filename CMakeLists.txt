@@ -10,7 +10,6 @@ add_subdirectory(libs/kissfft EXCLUDE_FROM_ALL)
 add_subdirectory(libs/glfw EXCLUDE_FROM_ALL)
 add_subdirectory(libs/glew EXCLUDE_FROM_ALL)
 add_subdirectory(libs/glm EXCLUDE_FROM_ALL)
-add_subdirectory(libs/pocketfft EXCLUDE_FROM_ALL)
 add_subdirectory(source)
 
 enable_testing()
