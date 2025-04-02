@@ -43,12 +43,17 @@ h = .66
 a = -k / h**2
 g_space_approx = a * (x_space - h)**2 + k  
 
-plt.plot(x_space, g_space, label="constant", linestyle="-")
-plt.plot(x_space, g_space_paper, label="constant (paper)", linestyle="--")
-plt.plot(x_space, g_space_linear, label="linear")
-plt.plot(x_space, g_space_approx, label="linear (approx)")
-plt.grid(True)
-plt.legend()
+plt.plot(x_space, g_space_paper, label="Constant Density", linestyle="--", color="blue", linewidth=2)
+plt.plot(x_space, g_space_linear, label="Radially Decreasing Density", linestyle="-", color="red", linewidth=2)
+plt.plot(x_space, g_space_approx, label="Radially Decreasing Density (Approx.)", linestyle=":", color="green", linewidth=2)
+
+plt.grid(True, linestyle="--", alpha=0.5)
+
+plt.xlabel(r"$r/R$")
+plt.ylabel(r"$g_r/(G\sigma_0)$")
+
+plt.legend(loc="best", frameon=True)
+
 plt.show()
 
 

@@ -63,9 +63,9 @@ void galaxySimulationPM(int n, int simLength) {
     */
   Vec3 galaxyCenter = Vec3(30, 30, 15);
   float rb = 3.0f;
-  float mb = 15.0f;
+  float mb = 60.0f;
   float rd = 15.0f;
-  float md = 60.0f;
+  float md = 15.0f;
   float thickness = 0.3f;
   float G = 4.5e-3f;
 
@@ -80,7 +80,7 @@ void galaxySimulationPM(int n, int simLength) {
     return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
   };
 
-  auto gridPoints = std::make_tuple(64, 64, 32);
+  auto gridPoints = std::make_tuple(128, 128, 64);
   std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
                              std::get<0>(gridPoints)};
   FFTWAdapter fftAdapter(dims);
@@ -105,9 +105,9 @@ void galaxySimulationP3M(int n, int simLength) {
     */
   Vec3 galaxyCenter = Vec3(30, 30, 15);
   float rb = 3.0f;
-  float mb = 15.0f;
+  float mb = 60.0f;
   float rd = 15.0f;
-  float md = 60.0f;
+  float md = 15.0f;
   float thickness = 0.3f;
   float G = 4.5e-3f;
 
