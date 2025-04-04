@@ -24,6 +24,7 @@ declareTimeAcc(inverseFFT);
 declareTimeAcc(fieldInCells);
 declareTimeAcc(updateAccelerations);
 declareTimeAcc(recordPositions);
+declareTimeAcc(pm);
 
 PMMethod::PMMethod(const std::vector<Vec3>& state,
                    const std::vector<float>& masses,
@@ -119,7 +120,7 @@ std::string PMMethod::run(const int simLength,
       integerStepVelocitiesToCodeUnits(particles, H, DT);
     }
 
-    pmMethodStep();
+    measureTime(pm, pmMethodStep());
 
     updateVelocities(particles);
   }
@@ -130,6 +131,8 @@ std::string PMMethod::run(const int simLength,
   printTime(inverseFFT);
   printTime(fieldInCells);
   printTime(updateAccelerations);
+  printTime(pm);
+
   printTime(recordPositions);
 
   return stateRecorder.flush();

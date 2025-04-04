@@ -9,9 +9,9 @@ int main() {
   int simLength = 200;
   Vec3 galaxyCenter(30, 30, 30);
   float rb = 3.0f;
-  float mb = 15.0f;
+  float mb = 60.0f;
   float rd = 15.0f;
-  float md = 60.0f;
+  float md = 15.0f;
   float thickness = 0.3f;
   float effectiveBoxSize = 60;
   float G = 4.5e-3f;
