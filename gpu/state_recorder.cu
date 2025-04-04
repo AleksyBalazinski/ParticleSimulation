@@ -37,10 +37,10 @@ void StateRecorder::recordPositions(std::vector<Vec3>::iterator begin,
   for (auto it = begin; it != end; ++it) {
     positionsStr += it->toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
     positionsStr += '\n';
-    ++positionsRecordsCnt;
-    saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
   }
   positionsStr += "\n\n";
+  ++positionsRecordsCnt;
+  saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
 }
 
 void StateRecorder::recordEnergy(float pe, float ke) {

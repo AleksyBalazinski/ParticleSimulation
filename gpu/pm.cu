@@ -1,60 +1,53 @@
 #include <cufft.h>
 #include <algorithm>
-#include <chrono>
 #include <execution>
 #include <iostream>
-#include "common.h"
 #include "conversions.cuh"
 #include "disk_sampler_linear.cuh"
 #include "external_fields.cuh"
 #include "helper_macros.h"
+#include "measure_time.cuh"
+#include "pm.cuh"
+#include "settings.cuh"
 #include "state_recorder.cuh"
 #include "utils.cuh"
 
-#define CELLS_CNT ((NG) * (NG) * (NG))
+#define CELLS_CNT ((NGx) * (NGy) * (NGz))
 #define BLOCK_SIZE 1024
 #define BLOCK_SIZE_X 16
 #define BLOCK_SIZE_Y 8
 #define BLOCK_SIZE_Z 8
 #define NUM_BLOCKS(n) (((BLOCK_SIZE) + (n) - 1) / (BLOCK_SIZE))
-#define GRID_IDX(x, y, z) ((x) + (y) * (NG) + (z) * (NG) * (NG))
+#define GRID_IDX(x, y, z) ((x) + (y) * (NGx) + (z) * (NGx) * (NGy))
 #define USE_SMEM
 
-float reassignDensityMs = 0;
-float forwardFFTMs = 0;
-float findFourierPotentialMs = 0;
-float inverseFFTMs = 0;
-float scaleAfterInverseMs = 0;
-float findFieldInCellsMs = 0;
-float updateAccelerationsMs = 0;
+declareCudaTimer(reassignDensity);
+declareCudaTimer(forwardFFT);
+declareCudaTimer(findFourierPotential);
+declareCudaTimer(inverseFFT);
+declareCudaTimer(scaleAfterInverse);
+declareCudaTimer(findFieldInCells);
+declareCudaTimer(updateAccelerations);
 
-cudaEvent_t reassignDensityStart, reassignDensityStop;
-cudaEvent_t forwardFFTStart, forwardFFTStop;
-cudaEvent_t findFourierPotentialStart, findFourierPotentialStop;
-cudaEvent_t inverseFFTStart, inverseFFTStop;
-cudaEvent_t scaleAfterInverseStart, scaleAfterInverseStop;
-cudaEvent_t findFieldInCellsStart, findFieldInCellsStop;
-cudaEvent_t updateAccelerationsStart, updateAccelerationsStop;
+declareHostTimer(memcpy);
+declareHostTimer(recordState);
+declareHostTimer(pm);
+declareHostTimer(boundsCheck);
 
 dim3 block;
 dim3 grid;
-
-float pmTimeMs = 0;
-float memcpyTimeMs = 0;
-float boundsCheckTimeMs = 0;
-float recordStateTimeMs = 0;
 
 __device__ inline int mod(int a, int b) {
   return (a % b + b) % b;
 }
 
 __device__ inline int modIndex(int i, int j, int k) {
-  return mod(i, NG) + mod(j, NG) * NG + mod(k, NG) * NG * NG;
+  return mod(i, NGx) + mod(j, NGy) * NGx + mod(k, NGz) * NGx * NGy;
 }
 
-bool isWithinBox(const Vec3 pos, float boxSize) {
-  return pos.x >= 0 && pos.x <= boxSize && pos.y >= 0 && pos.y <= boxSize && pos.z >= 0 &&
-         pos.z <= boxSize;
+bool isWithinBox(const Vec3 pos, Triple<float> boxSize) {
+  return pos.x >= 0 && pos.x <= boxSize.x && pos.y >= 0 && pos.y <= boxSize.y && pos.z >= 0 &&
+         pos.z <= boxSize.z;
 }
 
 __global__ void reassignDensity(cufftComplex* gridDensity,
@@ -97,19 +90,24 @@ __global__ void reassignDensity(cufftComplex* gridDensity,
   }
 }
 
+__host__ __device__ Triple<int> indexTripleFromFlat(int flatIndex) {
+  int x = flatIndex % NGx;
+  int y = (flatIndex / NGx) % NGy;
+  int z = flatIndex / (NGx * NGy);
+  return Triple(x, y, z);
+}
+
 __global__ void findFourierPotential(cufftComplex* potentialFourier,
                                      cufftComplex* gridDensityFourier) {
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < CELLS_CNT;
        idx += blockDim.x * gridDim.x) {
-    int kx = idx % NG;
-    int ky = (idx / NG) % NG;
-    int kz = idx / (NG * NG);
+    auto [kx, ky, kz] = indexTripleFromFlat(idx);
     if (kx == 0 && ky == 0 && kz == 0) {
       return;
     }
-    float sx = sinf(PI * kx / NG);
-    float sy = sinf(PI * ky / NG);
-    float sz = sinf(PI * kz / NG);
+    float sx = sinf(PI * kx / NGx);
+    float sy = sinf(PI * ky / NGy);
+    float sz = sinf(PI * kz / NGz);
     float green = -0.25f / (sx * sx + sy * sy + sz * sz);
 
     cufftComplex densityFourier = gridDensityFourier[GRID_IDX(kx, ky, kz)];
@@ -133,7 +131,7 @@ __global__ void findFieldInCells(Vec3* gridField, cufftComplex* gridPotential) {
   int idy = threadIdx.y + blockDim.y * blockIdx.y;
   int idz = threadIdx.z + blockDim.z * blockIdx.z;
 
-  if ((idx < NG) && (idy < NG) && (idz < NG)) {
+  if ((idx < NGx) && (idy < NGy) && (idz < NGz)) {
 #ifdef USE_SMEM
     int x = threadIdx.x + 1;
     int y = threadIdx.y + 1;
@@ -257,42 +255,37 @@ void pmMethodStep(Vec3* d_accelerations,
                   float DT,
                   float G) {
   cudaMemset(d_gridDensity, 0, CELLS_CNT * sizeof(cufftComplex));
-  cudaTime(reassignDensity, reassignDensity<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(
-                                d_gridDensity, d_positions, d_masses, H, DT, G));
+  measureCudaTime(reassignDensity, reassignDensity<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(
+                                       d_gridDensity, d_positions, d_masses, H, DT, G));
 
   cufftHandle plan = 0;
-  cufftPlan3d(&plan, NG, NG, NG, CUFFT_C2C);
-  cudaTime(forwardFFT, cufftExecC2C(plan, d_gridDensity, d_gridDensityFourier, CUFFT_FORWARD));
+  cufftPlan3d(&plan, NGz, NGy, NGx, CUFFT_C2C);
+  measureCudaTime(forwardFFT,
+                  cufftExecC2C(plan, d_gridDensity, d_gridDensityFourier, CUFFT_FORWARD));
 
   cudaMemset(d_gridPotentialFourier, 0, sizeof(cufftComplex) * CELLS_CNT);
-  cudaTime(findFourierPotential, findFourierPotential<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(
-                                     d_gridPotentialFourier, d_gridDensityFourier));
+  measureCudaTime(findFourierPotential, findFourierPotential<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(
+                                            d_gridPotentialFourier, d_gridDensityFourier));
 
   plan = 0;
-  cufftPlan3d(&plan, NG, NG, NG, CUFFT_C2C);
-  cudaTime(inverseFFT, cufftExecC2C(plan, d_gridPotentialFourier, d_gridPotential, CUFFT_INVERSE));
+  cufftPlan3d(&plan, NGz, NGy, NGx, CUFFT_C2C);
+  measureCudaTime(inverseFFT,
+                  cufftExecC2C(plan, d_gridPotentialFourier, d_gridPotential, CUFFT_INVERSE));
   scaleAfterInverse<<<NUM_BLOCKS(CELLS_CNT), BLOCK_SIZE>>>(d_gridPotential);
 
-  cudaTime(findFieldInCells, findFieldInCells<<<grid, block>>>(d_gridField, d_gridPotential));
+  measureCudaTime(findFieldInCells,
+                  findFieldInCells<<<grid, block>>>(d_gridField, d_gridPotential));
 
-  cudaTime(updateAccelerations,
-           updateAccelerations<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_accelerations, d_positions,
-                                                              d_gridField, bulgeParams, G, H, DT));
+  measureCudaTime(updateAccelerations,
+                  updateAccelerations<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(
+                      d_accelerations, d_positions, d_gridField, bulgeParams, G, H, DT));
 
-  cudaEventSynchronize(reassignDensityStop);
-  cudaEventSynchronize(forwardFFTStop);
-  cudaEventSynchronize(findFourierPotentialStop);
-  cudaEventSynchronize(inverseFFTStop);
-  cudaEventSynchronize(findFieldInCellsStop);
-  cudaEventSynchronize(updateAccelerationsStop);
-
-  float milliseconds;
-  cudaAccTime(milliseconds, reassignDensity);
-  cudaAccTime(milliseconds, forwardFFT);
-  cudaAccTime(milliseconds, findFourierPotential);
-  cudaAccTime(milliseconds, inverseFFT);
-  cudaAccTime(milliseconds, findFieldInCells);
-  cudaAccTime(milliseconds, updateAccelerations);
+  accCudaTime(reassignDensity);
+  accCudaTime(forwardFFT);
+  accCudaTime(findFourierPotential);
+  accCudaTime(inverseFFT);
+  accCudaTime(findFieldInCells);
+  accCudaTime(updateAccelerations);
 }
 
 __global__ void setHalfVelocities(Vec3* velocities, Vec3* accelerations) {
@@ -313,7 +306,7 @@ inline float toMs(const std::chrono::nanoseconds delta) {
 
 void pmMethod(std::vector<Vec3>& state,
               const std::vector<float>& masses,
-              float effectiveBoxSize,
+              Triple<float> effectiveBoxSize,
               float H,
               float DT,
               SphRadDecrFieldParams bulgeParams,
@@ -326,26 +319,13 @@ void pmMethod(std::vector<Vec3>& state,
   grid.y = (64 + block.y - 1) / block.y;
   grid.z = (64 + block.z - 1) / block.z;
 
-  cudaEventCreate(&reassignDensityStart);
-  cudaEventCreate(&reassignDensityStop);
-
-  cudaEventCreate(&forwardFFTStart);
-  cudaEventCreate(&forwardFFTStop);
-
-  cudaEventCreate(&findFourierPotentialStart);
-  cudaEventCreate(&findFourierPotentialStop);
-
-  cudaEventCreate(&inverseFFTStart);
-  cudaEventCreate(&inverseFFTStop);
-
-  cudaEventCreate(&scaleAfterInverseStart);
-  cudaEventCreate(&scaleAfterInverseStop);
-
-  cudaEventCreate(&findFieldInCellsStart);
-  cudaEventCreate(&findFieldInCellsStop);
-
-  cudaEventCreate(&updateAccelerationsStart);
-  cudaEventCreate(&updateAccelerationsStop);
+  createCudaEvents(reassignDensity);
+  createCudaEvents(forwardFFT);
+  createCudaEvents(findFourierPotential);
+  createCudaEvents(inverseFFT);
+  createCudaEvents(scaleAfterInverse);
+  createCudaEvents(findFieldInCells);
+  createCudaEvents(updateAccelerations);
 
   StateRecorder stateRecorder("output_gpu.txt", "a", "b");
 
@@ -391,40 +371,42 @@ void pmMethod(std::vector<Vec3>& state,
 
     stateToOrigUnits<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities, H, DT, N);
 
-    hostTime(memcpy,
-             cudaMemcpy(state.data(), d_positions, N * sizeof(Vec3), cudaMemcpyDeviceToHost));
+    measureHostTime(
+        memcpy, cudaMemcpy(state.data(), d_positions, N * sizeof(Vec3), cudaMemcpyDeviceToHost));
 
-    hostTime(recordState, stateRecorder.recordPositions(state.begin(), state.begin() + N));
+    measureHostTime(recordState, stateRecorder.recordPositions(state.begin(), state.begin() + N));
 
-    auto boundsBegin = std::chrono::steady_clock::now();
-    if (std::any_of(
-            std::execution::par_unseq, state.begin(), state.begin() + N,
-            [effectiveBoxSize](const Vec3& pos) { return !isWithinBox(pos, effectiveBoxSize); })) {
+    bool movedOutside = false;
+    measureHostTime(boundsCheck, movedOutside = std::any_of(
+                                     std::execution::par_unseq, state.begin(), state.begin() + N,
+                                     [effectiveBoxSize](const Vec3& pos) {
+                                       return !isWithinBox(pos, effectiveBoxSize);
+                                     }));
+    if (movedOutside) {
       std::cout << "Particle moved outside the grid.\n";
       break;
     }
-    auto boundsEnd = std::chrono::steady_clock::now();
-    boundsCheckTimeMs += toMs(boundsEnd - boundsBegin);
 
     stateToCodeUnits<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_positions, d_velocities, H, DT, N);
 
-    hostTime(pm, pmMethodStep(d_accelerations, d_gridDensity, d_gridDensityFourier, d_gridPotential,
-                              d_gridPotentialFourier, d_gridField, d_positions, d_masses,
-                              bulgeParams, H, DT, G));
+    measureHostTime(pm, pmMethodStep(d_accelerations, d_gridDensity, d_gridDensityFourier,
+                                     d_gridPotential, d_gridPotentialFourier, d_gridField,
+                                     d_positions, d_masses, bulgeParams, H, DT, G));
     updateVelocities<<<NUM_BLOCKS(N), BLOCK_SIZE>>>(d_velocities, d_accelerations);
   }
   cudaDeviceSynchronize();
   stateRecorder.flush();
-  std::cout << "reassign density: " << reassignDensityMs << '\n';
-  std::cout << "forward FFT: " << forwardFFTMs << '\n';
-  std::cout << "find fourier potential: " << findFourierPotentialMs << '\n';
-  std::cout << "inverse FFT: " << inverseFFTMs << '\n';
-  std::cout << "find field in cells: " << findFieldInCellsMs << '\n';
-  std::cout << "update accelerations: " << updateAccelerationsMs << '\n';
-  std::cout << "total PM: " << pmTimeMs << '\n';
-  std::cout << "memcpy: " << memcpyTimeMs << '\n';
-  std::cout << "bounds check: " << boundsCheckTimeMs << '\n';
-  std::cout << "record: " << recordStateTimeMs << '\n';
+
+  printCudaTime(reassignDensity);
+  printCudaTime(forwardFFT);
+  printCudaTime(findFourierPotential);
+  printCudaTime(inverseFFT);
+  printCudaTime(findFieldInCells);
+  printCudaTime(updateAccelerations);
+  printHostTime(pm);
+  printHostTime(memcpy);
+  printHostTime(boundsCheck);
+  printHostTime(recordState);
 
   cudaFree(d_masses);
   cudaFree(d_positions);
@@ -437,24 +419,11 @@ void pmMethod(std::vector<Vec3>& state,
   cudaFree(d_gridPotentialFourier);
   cudaFree(d_gridField);
 
-  cudaEventDestroy(reassignDensityStart);
-  cudaEventDestroy(reassignDensityStop);
-
-  cudaEventDestroy(forwardFFTStart);
-  cudaEventDestroy(forwardFFTStop);
-
-  cudaEventDestroy(findFourierPotentialStart);
-  cudaEventDestroy(findFourierPotentialStop);
-
-  cudaEventDestroy(inverseFFTStart);
-  cudaEventDestroy(inverseFFTStop);
-
-  cudaEventDestroy(scaleAfterInverseStart);
-  cudaEventDestroy(scaleAfterInverseStop);
-
-  cudaEventDestroy(findFieldInCellsStart);
-  cudaEventDestroy(findFieldInCellsStop);
-
-  cudaEventDestroy(updateAccelerationsStart);
-  cudaEventDestroy(updateAccelerationsStop);
+  destroyCudaEvents(reassignDensity);
+  destroyCudaEvents(forwardFFT);
+  destroyCudaEvents(findFourierPotential);
+  destroyCudaEvents(inverseFFT);
+  destroyCudaEvents(scaleAfterInverse);
+  destroyCudaEvents(findFieldInCells);
+  destroyCudaEvents(updateAccelerations);
 }
