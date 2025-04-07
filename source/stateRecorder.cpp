@@ -3,6 +3,8 @@
 #include "unitConversions.h"
 
 StateRecorder::StateRecorder(const char* positionsPath,
+                             int particlesCnt,
+                             int framesCnt,
                              const char* energyPath,
                              const char* momentumPath,
                              const char* expectedMomentumPath,
@@ -10,13 +12,14 @@ StateRecorder::StateRecorder(const char* positionsPath,
                              const char* fieldPath,
                              int maxRecords)
     : positionsPath(positionsPath),
+      particlesCnt(particlesCnt),
+      framesCnt(framesCnt),
       energyPath(energyPath),
       momentumPath(momentumPath),
       expectedMomentumPath(expectedMomentumPath),
       angularMomentumPath(angularMomentumPath),
       fieldPath(fieldPath),
       maxRecords(maxRecords),
-      positionsFile(positionsPath, std::ofstream::trunc),
       energyFile(energyPath, std::ofstream::trunc),
       momentumFile(momentumPath, std::ofstream::trunc),
       expectedMomentumFile(expectedMomentumPath, std::ofstream::trunc),
@@ -24,7 +27,11 @@ StateRecorder::StateRecorder(const char* positionsPath,
       fieldFile(fieldPath, std::ofstream::trunc),
       vecBuf(new char[vecBufSize]),
       singleBuf(new char[singleBufSize]) {
-  positionsStr.reserve(30 * maxRecords);
+  std::ofstream clearFile(positionsPath, std::ios::trunc);
+
+  positionsFile.open(positionsPath, std::ios::binary | std::ios::app);
+  positionsFile.write(reinterpret_cast<char*>(&this->particlesCnt), sizeof(int));
+  positionsFile.write(reinterpret_cast<char*>(&this->framesCnt), sizeof(int));
 }
 
 StateRecorder::~StateRecorder() {
@@ -36,22 +43,20 @@ StateRecorder::~StateRecorder() {
 void StateRecorder::recordPositions(std::vector<Vec3>::iterator begin,
                                     std::vector<Vec3>::iterator end) {
   for (auto it = begin; it != end; ++it) {
-    positionsStr += it->toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
-    positionsStr += '\n';
+    positionsBuf.emplace_back(it->x, it->y, it->z);
+    ++positionsRecordsCnt;
+    saveIfLimitHitBin(positionsFile, positionsBuf, positionsRecordsCnt);
   }
-  positionsStr += "\n\n";
-  ++positionsRecordsCnt;
-  saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
 }
 
 void StateRecorder::recordPositions(const std::vector<Particle>& particles) {
+  particlesCnt = int(particles.size());
+  ++framesCnt;
   for (const auto& p : particles) {
-    positionsStr += p.position.toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
-    positionsStr += '\n';
+    positionsBuf.emplace_back(p.position.x, p.position.y, p.position.z);
     ++positionsRecordsCnt;
-    saveIfLimitHit(positionsFile, positionsStr, positionsRecordsCnt);
+    saveIfLimitHitBin(positionsFile, positionsBuf, positionsRecordsCnt);
   }
-  positionsStr += "\n\n";
 }
 
 void StateRecorder::recordEnergy(float pe, float ke) {
@@ -96,7 +101,8 @@ void StateRecorder::recordField(const std::vector<Particle>& particles, float H,
 }
 
 std::string StateRecorder::flush() {
-  positionsFile << positionsStr;
+  positionsFile.write(reinterpret_cast<char*>(positionsBuf.data()),
+                      positionsBuf.size() * sizeof(Vec3));
   energyFile << energyStr;
   momentumFile << momentumStr;
   expectedMomentumFile << expectedMomentumStr;
@@ -113,5 +119,14 @@ void StateRecorder::saveIfLimitHit(std::ofstream& of, std::string& str, int& cou
 
   of << str;
   str.clear();
+  counter = 0;
+}
+
+void StateRecorder::saveIfLimitHitBin(std::ofstream& of, std::vector<Vec3>& buf, int& counter) {
+  if (counter < maxRecords)
+    return;
+
+  of.write(reinterpret_cast<char*>(buf.data()), buf.size() * sizeof(Vec3));
+  buf.clear();
   counter = 0;
 }

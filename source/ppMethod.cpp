@@ -67,7 +67,7 @@ std::string ppMethodRK4(std::vector<Vec3>& state,
                         const char* energyPath,
                         const char* momentumPath) {
   const int n = (int)masses.size();
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, "", "", "");
+  StateRecorder stateRecorder(positionsPath, n, simLength, energyPath, momentumPath, "", "", "");
 
   auto system = [&masses, G](StateType& x, StateType& dxdt, float t) {
     nBody(x, dxdt, t, masses, G);
@@ -100,7 +100,8 @@ std::string ppMethodLeapfrog(const std::vector<Vec3>& state,
                              const char* momentumPath,
                              const char* angularMomentumPath) {
   const int N = int(masses.size());
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, "", angularMomentumPath, "");
+  StateRecorder stateRecorder(positionsPath, N, simLength, energyPath, momentumPath, "",
+                              angularMomentumPath, "");
   std::vector<Particle> particles;
   for (int i = 0; i < N; ++i) {
     particles.emplace_back(state[i], state[N + i], masses[i]);

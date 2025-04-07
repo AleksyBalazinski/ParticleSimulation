@@ -57,8 +57,8 @@ void P3MMethod::run(const int simLength,
                     const char* expectedMomentumPath,
                     const char* angularMomentumPath) {
   std::vector<Particle>& particles = pmMethod.getParticles();
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath,
-                              angularMomentumPath, "");
+  StateRecorder stateRecorder(positionsPath, pmMethod.getParticles().size(), simLength, energyPath,
+                              momentumPath, expectedMomentumPath, angularMomentumPath, "");
   float H = pmMethod.getH();
   float DT = pmMethod.getDT();
   float G = pmMethod.getG();

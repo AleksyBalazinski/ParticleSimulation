@@ -1,38 +1,10 @@
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-import numpy as np
 import os
 import sys
-import math
+from load_data import *
 
-pos_max = [-math.inf] * 3
-pos_min = [math.inf] * 3
-
-def update_limits(position):
-    for i in range(3):
-        if position[i] > pos_max[i]:
-            pos_max[i] = position[i]
-        if position[i] < pos_min[i]:
-            pos_min[i] = position[i]
-
-def load_data(filename):
-    frames = []
-    with open(filename, 'r') as f:
-        block = []
-        for line in f:
-            if line.strip():
-                position = list(map(float, line.split()))
-                block.append(position)
-                update_limits(position)
-            elif block:  # Blank line after a block
-                frames.append(np.array(block))
-                block = []
-        if block:
-            frames.append(np.array(block))
-    print(len(frames))
-    return frames
-
-frames = load_data(sys.argv[1])
+frames = load_data(r"C:\Projects\ParticleSimulation\build\source\Release\output.txt")
 print(f"x: ({pos_min[0]}, {pos_max[0]}), y: ({pos_min[1]}, {pos_max[1]}), z: ({pos_min[2]}, {pos_max[2]})")
 fig = plt.figure(figsize=(8, 8))
 ax = fig.add_subplot(111)

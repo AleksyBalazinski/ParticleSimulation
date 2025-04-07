@@ -9,6 +9,8 @@
 class StateRecorder {
  public:
   StateRecorder(const char* positionsPath,
+                int particlesCnt,
+                int framesCnt,
                 const char* energyPath,
                 const char* momentumPath,
                 const char* expectedMomentumPath,
@@ -31,8 +33,11 @@ class StateRecorder {
 
  private:
   void saveIfLimitHit(std::ofstream& of, std::string& str, int& counter);
+  void saveIfLimitHitBin(std::ofstream& of, std::vector<Vec3>& buf, int& counter);
 
-  std::string positionsStr;
+  std::vector<Vec3> positionsBuf;
+  int particlesCnt;
+  int framesCnt;
   std::string energyStr;
   std::string momentumStr;
   std::string expectedMomentumStr;

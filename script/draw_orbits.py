@@ -3,37 +3,10 @@ import matplotlib.animation as animation
 import numpy as np
 import os
 import sys
-import math
-
-pos_max = [-math.inf] * 3
-pos_min = [math.inf] * 3
+from load_data import *
 
 # Store all trajectories
 trajectories = []
-
-def update_limits(position):
-    for i in range(3):
-        if position[i] > pos_max[i]:
-            pos_max[i] = position[i]
-        if position[i] < pos_min[i]:
-            pos_min[i] = position[i]
-
-def load_data(filename):
-    frames = []
-    with open(filename, 'r') as f:
-        block = []
-        for line in f:
-            if line.strip():
-                position = list(map(float, line.split()))
-                block.append(position)
-                update_limits(position)
-            elif block:  # Blank line after a block
-                frames.append(np.array(block))
-                block = []
-        if block:
-            frames.append(np.array(block))
-    print(len(frames))
-    return frames
 
 frames = load_data(sys.argv[1])
 num_particles = len(frames[0])  # Assuming each frame has the same number of particles

@@ -18,7 +18,7 @@ class P3MMethod {
 
   void run(const int simLength,
            bool collectDiagnostics = false,
-           const char* positionsPath = "output.txt",
+           const char* positionsPath = "output.dat",
            const char* energyPath = "energy.txt",
            const char* momentumPath = "momentum.txt",
            const char* expectedMomentumPath = "expected_momentum.txt",

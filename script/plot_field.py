@@ -1,19 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import math
 import sys
+from load_data import *
 
-pos_max = [-math.inf] * 3
-pos_min = [math.inf] * 3
 m = 1
 G = 4.5e-3
-
-def update_limits(position):
-    for i in range(3):
-        if position[i] > pos_max[i]:
-            pos_max[i] = position[i]
-        if position[i] < pos_min[i]:
-            pos_min[i] = position[i]
 
 def s1_smoothed_g(rs, a):
     gs = []
@@ -37,24 +28,6 @@ def s2_smoothed_g(rs, a):
             gs.append(G * m / r**2)
     
     return gs
-
-def load_data(filename, up_limits = False):
-    frames = []
-    with open(filename, 'r') as f:
-        block = []
-        for line in f:
-            if line.strip():
-                position = list(map(float, line.split()))
-                block.append(position)
-                if up_limits:
-                    update_limits(position)
-            elif block:  # Blank line after a block
-                frames.append(np.array(block))
-                block = []
-        if block:
-            frames.append(np.array(block))
-    print(f"Total frames loaded: {len(frames)}")
-    return frames
 
 frames = load_data(sys.argv[1])
 field = load_data(sys.argv[2])
