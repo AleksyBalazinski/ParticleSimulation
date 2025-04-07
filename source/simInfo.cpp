@@ -69,6 +69,28 @@ float SimInfo::potentialEnergy(const Grid& grid,
   return 0.5f * vol * internal + external;
 }
 
+float SimInfo::potentialEnergy(const std::vector<std::complex<float>>& gridDensity,
+                               const std::vector<std::complex<float>>& gridPotential,
+                               const std::vector<Particle>& particles,
+                               std::function<float(Vec3)> externalPotential,
+                               float H,
+                               float DT,
+                               float G) {
+  float internal = 0;
+  for (int i = 0; i < gridDensity.size(); ++i) {
+    internal += densityToOriginalUnits(gridDensity[i].real(), DT, G) *
+                potentialToOriginalUnits(gridPotential[i].real(), H, DT);
+  }
+
+  float external = 0;
+  for (const auto& p : particles) {
+    external += p.mass * externalPotential(p.position);
+  }
+
+  float vol = H * H * H;
+  return 0.5f * vol * internal + external;
+}
+
 float SimInfo::kineticEnergy(const std::vector<Particle>& particles) {
   float ke = 0;
   for (const auto& p : particles) {

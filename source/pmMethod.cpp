@@ -24,6 +24,7 @@ declareTimeAcc(inverseFFT);
 declareTimeAcc(fieldInCells);
 declareTimeAcc(updateAccelerations);
 declareTimeAcc(recordPositions);
+declareTimeAcc(pm);
 
 PMMethod::PMMethod(const std::vector<Vec3>& state,
                    const std::vector<float>& masses,
@@ -42,6 +43,7 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
       effectiveBoxSizeX(std::get<0>(effectiveBoxSize)),
       effectiveBoxSizeY(std::get<1>(effectiveBoxSize)),
       effectiveBoxSizeZ(std::get<2>(effectiveBoxSize)),
+      N(int(masses.size())),
       externalField(externalField),
       externalPotential(externalPotential),
       H(H),
@@ -51,7 +53,6 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
       fds(fds),
       gFunc(gFunc),
       particleDiameter(lengthToCodeUnits(particleDiameter, H)) {
-  this->N = static_cast<int>(masses.size());
   for (int i = 0; i < N; ++i) {
     this->particles.emplace_back(state[i], state[N + i], masses[i]);
   }
@@ -66,8 +67,8 @@ std::string PMMethod::run(const int simLength,
                           const char* expectedMomentumPath,
                           const char* angularMomentumPath,
                           const char* fieldPath) {
-  StateRecorder stateRecorder(positionsPath, energyPath, momentumPath, expectedMomentumPath,
-                              angularMomentumPath, fieldPath);
+  StateRecorder stateRecorder(positionsPath, N, simLength + 1, energyPath, momentumPath,
+                              expectedMomentumPath, angularMomentumPath, fieldPath);
   SimInfo simInfo;
 
   if (collectDiagnostics) {
@@ -119,7 +120,7 @@ std::string PMMethod::run(const int simLength,
       integerStepVelocitiesToCodeUnits(particles, H, DT);
     }
 
-    pmMethodStep();
+    measureTime(pm, pmMethodStep());
 
     updateVelocities(particles);
   }
@@ -130,6 +131,8 @@ std::string PMMethod::run(const int simLength,
   printTime(inverseFFT);
   printTime(fieldInCells);
   printTime(updateAccelerations);
+  printTime(pm);
+
   printTime(recordPositions);
 
   return stateRecorder.flush();
@@ -193,7 +196,7 @@ void PMMethod::initGreensFunction() {
   });
 }
 
-float TSCAssignmentFunc(float x, int t) {
+float PMMethod::TSCAssignmentFunc(float x, int t) {
   if (t == 1) {
     return 0.5f * (0.5f + x) * (0.5f + x);
   }
@@ -366,7 +369,6 @@ Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, Grid& grid) {
     fieldY = -0.5f * (grid.getPotential(x, y + 1, z) - grid.getPotential(x, y - 1, z));
     fieldZ = -0.5f * (grid.getPotential(x, y, z + 1) - grid.getPotential(x, y, z - 1));
   } else if (fds == FiniteDiffScheme::FOUR_POINT) {
-    float alpha = 4.0f / 3;
     fieldX = (-1.0f / 12) * (-grid.getPotential(x + 2, y, z) + 8 * grid.getPotential(x + 1, y, z) -
                              8 * grid.getPotential(x - 1, y, z) + grid.getPotential(x - 2, y, z));
     fieldY = (-1.0f / 12) * (-grid.getPotential(x, y + 2, z) + 8 * grid.getPotential(x, y + 1, z) -

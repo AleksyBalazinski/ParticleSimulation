@@ -1,34 +1,6 @@
 import matplotlib.pyplot as plt
-import numpy as np
-import math
 import sys
-
-pos_max = [-math.inf] * 3
-pos_min = [math.inf] * 3
-
-def update_limits(position):
-    for i in range(3):
-        if position[i] > pos_max[i]:
-            pos_max[i] = position[i]
-        if position[i] < pos_min[i]:
-            pos_min[i] = position[i]
-
-def load_data(filename):
-    frames = []
-    with open(filename, 'r') as f:
-        block = []
-        for line in f:
-            if line.strip():
-                position = list(map(float, line.split()))
-                block.append(position)
-                update_limits(position)
-            elif block:  # Blank line after a block
-                frames.append(np.array(block))
-                block = []
-        if block:
-            frames.append(np.array(block))
-    print(f"Total frames loaded: {len(frames)}")
-    return frames
+from load_data import *
 
 frames = load_data(sys.argv[1])
 
@@ -41,8 +13,7 @@ fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.set_xlim(0, 60)
 ax.set_ylim(0, 60)
-# ax.set_zlim([pos_min[2], pos_max[2]])
-ax.set_zlim(0, 60)
+ax.set_zlim(0, 30)
 
 ax.set_xlabel('x (kpc)')
 ax.set_ylabel('y (kpc)')

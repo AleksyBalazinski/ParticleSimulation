@@ -23,9 +23,9 @@ l_x = angular_momentum_data[:, 0]
 l_y = angular_momentum_data[:, 1]
 l_z = angular_momentum_data[:, 2]
 plt.figure(2)
-plt.plot(time, l_x, label='l_x', color='blue')
-plt.plot(time, l_y, label='l_y', color='green')
-plt.plot(time, l_z, label='l_z', color='red')
+plt.plot(time, l_x, label='$l_x$', color='blue')
+plt.plot(time, l_y, label='$l_y$', color='green')
+plt.plot(time, l_z, label='$l_z$', color='red')
 plt.xlabel('Time')
 plt.ylabel('Angular momentum components')
 plt.legend()
@@ -45,13 +45,13 @@ if(len(sys.argv) >= 5):
 time = np.arange(len(p_x))
 
 plt.figure(3)
-plt.plot(time, p_x, label='p_x', color='blue')
-plt.plot(time, p_y, label='p_y', color='green')
-plt.plot(time, p_z, label='p_z', color='red')
+plt.plot(time, p_x, label='$p_x$', color='blue')
+plt.plot(time, p_y, label='$p_y$', color='green')
+plt.plot(time, p_z, label='$p_z$', color='red')
 if(len(sys.argv) >= 5):
-    plt.plot(time, pe_x, label='pe_x', color='blue', linestyle='--')
-    plt.plot(time, pe_y, label='pe_y', color='green', linestyle='--')
-    plt.plot(time, pe_z, label='pe_z', color='red', linestyle='--')
+    plt.plot(time, pe_x, label='$p_x$ (expected)', color='blue', linestyle='--')
+    plt.plot(time, pe_y, label='$p_y$ (expected)', color='green', linestyle='--')
+    plt.plot(time, pe_z, label='$p_z$ (expected)', color='red', linestyle='--')
 
 plt.xlabel('Time')
 plt.ylabel('Momentum components')

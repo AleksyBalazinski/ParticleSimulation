@@ -134,7 +134,7 @@ std::complex<float> GreenOptimalTSC(int kx,
   }
 
   std::complex<float> numerator = dotProduct(D, numDotRight);
-  float denominator = DNormSquared * denomSum;
+  float denominator = DNormSquared * denomSum * denomSum;
 
   return numerator / denominator;
 }
