@@ -8,22 +8,16 @@
 
 class ChainingMesh {
  public:
-  struct LLNode {
-    int particleId;
-    LLNode* next;
-    LLNode(int particleId, LLNode* next);
-    LLNode() = default;
-  };
-
   ChainingMesh(std::tuple<float, float, float> compBoxSize, float cutoffRadius, float H, int N);
 
-  void fillWithYSorting(const std::vector<Particle>& particles);
+  void fillWithYSorting(std::vector<Particle>& particles);
 
   std::array<int, 14> getNeighborsAndSelf(int cellIdx) const;
 
-  inline LLNode* getParticlesInCell(int cellIdx) { return hoc[cellIdx]; }
+  inline int getParticlesInCell(int cellIdx) { return hoc[cellIdx]; }
   inline int getSize() const { return size; };
   inline std::tuple<int, int, int> getLength() const { return std::make_tuple(Mx, My, Mz); }
+  inline int listEnd() const { return -1; }
 
  private:
   int tripleToFlatIndex(int x, int y, int z) const;
@@ -38,6 +32,5 @@ class ChainingMesh {
   float HCy;
   float HCz;
   int size;
-  std::vector<LLNode*> hoc;
-  std::unique_ptr<LLNode[]> nodePool;
+  std::vector<int> hoc;
 };

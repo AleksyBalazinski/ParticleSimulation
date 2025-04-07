@@ -42,9 +42,9 @@ P3MMethod::P3MMethod(PMMethod& pmMethod,
 
 void correctAccelerations(std::vector<Particle>& particles) {
   std::for_each(std::execution::par, particles.begin(), particles.end(), [](Particle& p) {
-    Vec3 totalSRForce =
-        std::accumulate(p.shortRangeFromNeighbor.begin(), p.shortRangeFromNeighbor.end(), Vec3()) +
-        p.shortRangeForce;
+    Vec3 totalSRForce = std::accumulate(p.shortRangeFromNeighbor.begin(),
+                                        p.shortRangeFromNeighbor.end(), Vec3::zero()) +
+                        p.shortRangeForce;
     p.acceleration += totalSRForce / p.mass;
   });
 }
@@ -138,9 +138,9 @@ void P3MMethod::run(const int simLength,
 void P3MMethod::calculateShortRangeForces(std::vector<Particle>& particles) {
   const int maxThreads = std::thread::hardware_concurrency();
   std::for_each(std::execution::par, particles.begin(), particles.end(), [](Particle& p) {
-    p.shortRangeForce = Vec3();
+    p.shortRangeForce = Vec3::zero();
     for (auto& srForceNeighbor : p.shortRangeFromNeighbor) {
-      srForceNeighbor = Vec3();
+      srForceNeighbor = Vec3::zero();
     }
   });
 
@@ -268,14 +268,14 @@ void P3MMethod::updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Par
         continue;
       }
 
-      for (auto node = chainingMesh.getParticlesInCell(q); node != nullptr; node = node->next) {
-        for (auto nodeN = chainingMesh.getParticlesInCell(qn); nodeN != nullptr;
-             nodeN = nodeN->next) {
-          if (particles[nodeN->particleId].position.y - particles[node->particleId].position.y >
-              cutoffRadius) {
+      for (auto node = chainingMesh.getParticlesInCell(q); node != chainingMesh.listEnd();
+           node = particles[node].HOCNext) {
+        for (auto nodeN = chainingMesh.getParticlesInCell(qn); nodeN != chainingMesh.listEnd();
+             nodeN = particles[nodeN].HOCNext) {
+          if (particles[nodeN].position.y - particles[node].position.y > cutoffRadius) {
             break;
           }
-          updateSRForces(node->particleId, nodeN->particleId, q, qn, i, particles);
+          updateSRForces(node, nodeN, q, qn, i, particles);
         }
       }
     }

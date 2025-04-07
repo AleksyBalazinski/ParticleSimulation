@@ -45,7 +45,10 @@ class Grid {
 
  private:
   inline int mod(int a, int b) const { return (a % b + b) % b; }
-  int getWrappedIndx(int i, int j, int k) const;
+  inline int getWrappedIndx(int i, int j, int k) const {
+    return mod(i, gridPointsX) + mod(j, gridPointsY) * gridPointsX +
+           mod(k, gridPointsZ) * gridPointsX * gridPointsY;
+  }
   inline int getIndx(int i, int j, int k) const {
     return i + j * gridPointsX + k * gridPointsX * gridPointsY;
   }

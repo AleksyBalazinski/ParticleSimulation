@@ -10,6 +10,7 @@ struct Particle {
   Vec3 integerStepVelocity;
   Vec3 shortRangeForce;
   std::array<Vec3, 13> shortRangeFromNeighbor;
+  int HOCNext;
 
   Particle(Vec3 position, Vec3 velocity, float mass);
 };

@@ -27,6 +27,15 @@ class SimInfo {
                                float H,
                                float DT,
                                float G);
+  static float potentialEnergy(const std::vector<std::complex<float>>& gridDensity,
+                               const std::vector<std::complex<float>>& gridPotential,
+                               const std::vector<Particle>& particles,
+                               std::function<float(Vec3)> externalPotential,
+                               float H,
+                               float DT,
+                               float G,
+                               int gridLength);
+
   static float kineticEnergy(const std::vector<Particle>& particles);
 
   static Vec3 totalMomentum(const std::vector<Particle>& particles);

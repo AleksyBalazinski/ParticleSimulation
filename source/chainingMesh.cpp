@@ -1,7 +1,6 @@
 #include "chainingMesh.h"
+#include <algorithm>
 #include "unitConversions.h"
-
-ChainingMesh::LLNode::LLNode(int particleId, LLNode* next) : particleId(particleId), next(next) {}
 
 ChainingMesh::ChainingMesh(std::tuple<float, float, float> compBoxSize,
                            float cutoffRadius,
@@ -14,28 +13,31 @@ ChainingMesh::ChainingMesh(std::tuple<float, float, float> compBoxSize,
       HCy(lengthToCodeUnits(std::get<1>(compBoxSize) / My, H)),
       HCz(lengthToCodeUnits(std::get<2>(compBoxSize) / Mz, H)),
       size(Mx * My * Mz),
-      hoc(size, nullptr),
-      nodePool(new LLNode[N]) {}
+      hoc(size, -1) {}
 
-void ChainingMesh::fillWithYSorting(const std::vector<Particle>& particles) {
-  std::memset(hoc.data(), 0, size * sizeof(LLNode*));
+void ChainingMesh::fillWithYSorting(std::vector<Particle>& particles) {
+  std::memset(hoc.data(), -1, size * sizeof(int));
 
   for (int i = 0; i < particles.size(); ++i) {
-    const auto& p = particles[i];
+    auto& p = particles[i];
     int cellX = int(p.position.x / HCx);
     int cellY = int(p.position.y / HCy);
     int cellZ = int(p.position.z / HCz);
 
     int cellIdx = tripleToFlatIndex(cellX, cellY, cellZ);
-    LLNode* head = hoc[cellIdx];
-    if (head == nullptr || particles[head->particleId].position.y > p.position.y) {
-      hoc[cellIdx] = new (nodePool.get() + i) LLNode(i, head);
+    const int head = hoc[cellIdx];
+    if (head == listEnd() || particles[head].position.y > p.position.y) {
+      hoc[cellIdx] = i;
+      p.HOCNext = head;
       continue;
     }
 
-    for (LLNode* node = head; node != nullptr; node = node->next) {
-      if (node->next == nullptr || particles[node->next->particleId].position.y > p.position.y) {
-        node->next = new (nodePool.get() + i) LLNode(i, node->next);
+    for (int node = head; node != listEnd(); node = particles[node].HOCNext) {
+      if (particles[node].HOCNext == listEnd() ||
+          particles[particles[node].HOCNext].position.y > p.position.y) {
+        int t = particles[node].HOCNext;
+        particles[node].HOCNext = i;
+        p.HOCNext = t;
         break;
       }
     }

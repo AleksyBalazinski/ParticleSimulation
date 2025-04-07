@@ -74,8 +74,3 @@ std::complex<float> Grid::getGreensFunction(int i, int j, int k) const {
 void Grid::setGreensFunction(int i, int j, int k, std::complex<float> value) {
   greensFunction[getIndx(i, j, k)] = value;
 }
-
-int Grid::getWrappedIndx(int i, int j, int k) const {
-  return mod(i, gridPointsX) + mod(j, gridPointsY) * gridPointsX +
-         mod(k, gridPointsZ) * gridPointsX * gridPointsY;
-}

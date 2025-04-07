@@ -1,4 +1,7 @@
 #include "FFTWAdapter.h"
+#ifdef CUDA
+#include "PMMethodGPU.h"
+#endif
 #include "diskSamplerLinear.h"
 #include "externalFields.h"
 #include "grid.h"
@@ -13,7 +16,7 @@ std::vector<Vec3> linearSpacing(int n, float dx, Vec3 center) {
 
   for (int i = 0; i < n; ++i) {
     state[i] = center + Vec3(i * dx, 0, 0);
-    state[n + i] = Vec3();
+    state[n + i] = Vec3::zero();
   }
 
   return state;
@@ -34,7 +37,7 @@ void probeField() {
   std::vector<float> masses(n, 0);
   masses[0] = 1.0f;
 
-  auto externalField = [](Vec3 pos) -> Vec3 { return Vec3(); };
+  auto externalField = [](Vec3 pos) -> Vec3 { return Vec3::zero(); };
   auto externalPotential = [](Vec3 pos) -> float { return 0; };
 
   auto gridPoints = std::make_tuple(64, 64, 32);
@@ -83,16 +86,21 @@ void galaxySimulationPM(int n, int simLength) {
   auto gridPoints = std::make_tuple(128, 128, 64);
   std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
                              std::get<0>(gridPoints)};
-  FFTWAdapter fftAdapter(dims);
-  Grid grid(gridPoints, fftAdapter);
   auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
   float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
   float DT = 1;
 
+#ifdef CUDA
+  PMMethodGPU pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+                 InterpolationScheme::CIC, FiniteDiffScheme::TWO_POINT,
+                 GreensFunction::DISCRETE_LAPLACIAN, 0, gridPoints);
+#else
+  FFTWAdapter fftAdapter(dims);
+  Grid grid(gridPoints, fftAdapter);
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
               InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
               GreensFunction::DISCRETE_LAPLACIAN, 0, grid);
-
+#endif
   pm.run(simLength, true /*diagnostics*/);
 }
 
@@ -148,7 +156,7 @@ void smallSimPP() {
   std::vector<float> masses = {20, 5, 1e2};
   std::vector<Vec3> state = {
       Vec3(30, 30, 15), Vec3(45, 32, 15),  Vec3(30, 10, 15),  // positions
-      Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3()             // velocities
+      Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3::zero()       // velocities
   };
 
   int simLength = 100;
@@ -177,7 +185,7 @@ void smallSimP3M() {
   std::vector<float> masses = {20, 5, 1e2};
   std::vector<Vec3> state = {
       Vec3(30, 30, 15), Vec3(45, 32, 15),  Vec3(30, 10, 15),  // positions
-      Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3()             // velocities
+      Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3::zero()       // velocities
   };
 
   int simLength = 100;
@@ -191,7 +199,7 @@ void smallSimP3M() {
   auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
   float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
   float DT = 1;
-  auto externalField = [](Vec3 pos) -> Vec3 { return Vec3(); };
+  auto externalField = [](Vec3 pos) -> Vec3 { return Vec3::zero(); };
   auto externalPotential = [](Vec3 pos) -> float { return 0; };
   float a = 7.5f;
 

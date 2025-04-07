@@ -19,9 +19,14 @@ Vec3 operator/(const Vec3& a, float s) {
   return Vec3(a.x / s, a.y / s, a.z / s);
 }
 
-Vec3::Vec3(float x, float y, float z) : x(x), y(y), z(z) {}
+Vec3 Vec3::create(float x, float y, float z) {
+  Vec3 v;
+  v.x = x;
+  v.y = y;
+  v.z = z;
 
-Vec3::Vec3() : x(0), y(0), z(0) {}
+  return v;
+}
 
 Vec3& Vec3::operator+=(const Vec3 other) {
   x += other.x;
