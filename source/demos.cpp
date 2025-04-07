@@ -140,9 +140,15 @@ void galaxySimulationP3M(int n, int simLength) {
   float DT = 1;
   float a = 3 * H;
 
+#ifdef CUDA
+  PMMethodGPU pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+                 InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
+                 GreensFunction::DISCRETE_LAPLACIAN, 0, gridPoints);
+#else
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
               InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL, a,
               grid);
+#endif
 
   float re = 0.7f * a;
   float softeningLength = 1.5f;
@@ -168,7 +174,7 @@ void smallSimPP() {
 
 void bigSimPP() {
   const int n = 30000;
-  std::vector<float> masses = randomMasses(n, {0.002, 0.002});
+  std::vector<float> masses = randomMasses(n, {0.002f, 0.002f});
   std::vector<Vec3> state =
       randomInitialState(n, {Vec3(15, 15, 15), Vec3(45, 45, 45)},
                          {Vec3(-0.01f, -0.01f, -0.01f), Vec3(0.01f, 0.01f, 0.01f)});
@@ -203,9 +209,15 @@ void smallSimP3M() {
   auto externalPotential = [](Vec3 pos) -> float { return 0; };
   float a = 7.5f;
 
+#ifdef CUDA
+  PMMethodGPU pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+                 InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
+                 GreensFunction::DISCRETE_LAPLACIAN, 0, gridPoints);
+#else
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
               InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL, a,
               grid);
+#endif
 
   float re = 0.7f * a;
   float softeningLength = 0.5f;

@@ -36,6 +36,14 @@ class PMMethodGPU {
                   const char* angularMomentumPath = "angular_momentum.txt",
                   const char* fieldPath = "field.txt");
 
+  std::vector<Particle>& getParticles() { return particles; };
+  float getH() const { return H; }
+  float getDT() const { return DT; };
+  float getG() const { return G; };
+  const std::vector<std::complex<float>>& getGridDensity() const { return gridDensity; }
+  const std::vector<std::complex<float>>& getGridPotential() const { return gridPotential; }
+  std::function<float(Vec3)> getExternalPotential() const { return externalPotential; };
+
   void pmMethodStep();
 
   bool escapedComputationalBox();
@@ -43,6 +51,12 @@ class PMMethodGPU {
   Vec3 totalExternalForceOrigUnits();
 
   void initGreensFunction();
+
+  void copyParticlesDeviceToHost();
+  void copyParticlesHostToDevice();
+
+  void copyGridPotentialToHost();
+  void copyGridDensityToHost();
 
  private:
   void spreadMass();

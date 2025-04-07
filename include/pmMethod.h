@@ -35,13 +35,12 @@ class PMMethod {
                   const char* angularMomentumPath = "angular_momentum.txt",
                   const char* fieldPath = "field.txt");
 
-  inline std::vector<Particle>& getParticles() { return particles; };
-
-  inline float getH() const { return H; }
-  inline float getDT() const { return DT; };
-  inline float getG() const { return G; };
-  inline const Grid& getGrid() const { return grid; };
-  inline std::function<float(Vec3)> getExternalPotential() const { return externalPotential; };
+  std::vector<Particle>& getParticles() { return particles; };
+  float getH() const { return H; }
+  float getDT() const { return DT; };
+  float getG() const { return G; };
+  const Grid& getGrid() const { return grid; };
+  std::function<float(Vec3)> getExternalPotential() const { return externalPotential; };
 
   void pmMethodStep();
 

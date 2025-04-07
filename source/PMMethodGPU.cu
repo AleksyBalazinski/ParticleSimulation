@@ -138,7 +138,7 @@ std::string PMMethodGPU::run(const int simLength,
       cudaMemcpy(gridPotential.data(), grid.d_potential, grid.getLength() * sizeof(cufftComplex),
                  cudaMemcpyDeviceToHost);
       auto pe = SimInfo::potentialEnergy(gridDensity, gridPotential, particles, externalPotential,
-                                         H, DT, G, grid.getLength());
+                                         H, DT, G);
       auto ke = SimInfo::kineticEnergy(particles);
       stateRecorder.recordEnergy(pe, ke);
     }
@@ -247,6 +247,24 @@ void PMMethodGPU::initGreensFunction() {
 
   cudaMemcpy(grid.d_greensFunction, greensFunction.data(), grid.getLength() * sizeof(cufftComplex),
              cudaMemcpyHostToDevice);
+}
+
+void PMMethodGPU::copyParticlesDeviceToHost() {
+  cudaMemcpy(particles.data(), d_particles, N * sizeof(Particle), cudaMemcpyDeviceToHost);
+}
+
+void PMMethodGPU::copyParticlesHostToDevice() {
+  cudaMemcpy(d_particles, particles.data(), N * sizeof(Particle), cudaMemcpyHostToDevice);
+}
+
+void PMMethodGPU::copyGridPotentialToHost() {
+  cudaMemcpy(gridPotential.data(), grid.d_potential, grid.getLength() * sizeof(cufftComplex),
+             cudaMemcpyDeviceToHost);
+}
+
+void PMMethodGPU::copyGridDensityToHost() {
+  cudaMemcpy(gridDensity.data(), grid.d_density, grid.getLength() * sizeof(cufftComplex),
+             cudaMemcpyDeviceToHost);
 }
 
 __global__ void spreadMassNGPKernel(GridGPU grid, Particle* particles, int N) {

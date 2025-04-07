@@ -33,8 +33,7 @@ class SimInfo {
                                std::function<float(Vec3)> externalPotential,
                                float H,
                                float DT,
-                               float G,
-                               int gridLength);
+                               float G);
 
   static float kineticEnergy(const std::vector<Particle>& particles);
 

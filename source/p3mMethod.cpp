@@ -16,14 +16,19 @@ declareTimeAcc(shortRangeForcesCalc);
 declareTimeAcc(pmStep);
 declareTimeAcc(correctAccelerations);
 
-P3MMethod::P3MMethod(PMMethod& pmMethod,
-                     std::tuple<float, float, float> compBoxSize,
-                     float cutoffRadius,
-                     float particleDiameter,
-                     float H,
-                     float softeningLength,
-                     CloudShape cloudShape,
-                     bool useSRForceTable)
+P3MMethod::P3MMethod(
+#ifdef CUDA
+    PMMethodGPU& pmMethod,
+#else
+    PMMethod& pmMethod,
+#endif
+    std::tuple<float, float, float> compBoxSize,
+    float cutoffRadius,
+    float particleDiameter,
+    float H,
+    float softeningLength,
+    CloudShape cloudShape,
+    bool useSRForceTable)
     : pmMethod(pmMethod),
       chainingMesh(compBoxSize, cutoffRadius, H, int(pmMethod.getParticles().size())),
       cutoffRadius(lengthToCodeUnits(cutoffRadius, pmMethod.getH())),
@@ -57,8 +62,9 @@ void P3MMethod::run(const int simLength,
                     const char* expectedMomentumPath,
                     const char* angularMomentumPath) {
   std::vector<Particle>& particles = pmMethod.getParticles();
-  StateRecorder stateRecorder(positionsPath, pmMethod.getParticles().size(), simLength, energyPath,
-                              momentumPath, expectedMomentumPath, angularMomentumPath, "");
+  StateRecorder stateRecorder(positionsPath, int(pmMethod.getParticles().size()), simLength,
+                              energyPath, momentumPath, expectedMomentumPath, angularMomentumPath,
+                              "");
   float H = pmMethod.getH();
   float DT = pmMethod.getDT();
   float G = pmMethod.getG();
@@ -71,7 +77,13 @@ void P3MMethod::run(const int simLength,
   massToCodeUnits(particles, H, DT, G);
 
   pmMethod.initGreensFunction();
+#ifdef CUDA
+  pmMethod.copyParticlesHostToDevice();
+#endif
   measureTime(pmStep, pmMethod.pmMethodStep());
+#ifdef CUDA
+  pmMethod.copyParticlesDeviceToHost();
+#endif
   measureTime(shortRangeForcesCalc, calculateShortRangeForces(particles));
   measureTime(correctAccelerations, correctAccelerations(particles));
 
@@ -99,8 +111,15 @@ void P3MMethod::run(const int simLength,
       stateRecorder.recordExpectedMomentum(expectedMomentum);
       stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
       stateRecorder.recordTotalAngularMomentum(SimInfo::totalAngularMomentum(particles));
+#ifdef CUDA
+      pmMethod.copyGridDensityToHost();
+      pmMethod.copyGridPotentialToHost();
+      auto pe = SimInfo::potentialEnergy(pmMethod.getGridDensity(), pmMethod.getGridPotential(),
+                                         particles, pmMethod.getExternalPotential(), H, DT, G);
+#else
       auto pe = SimInfo::potentialEnergy(pmMethod.getGrid(), particles,
                                          pmMethod.getExternalPotential(), H, DT, G);
+#endif
       auto ke = SimInfo::kineticEnergy(particles);
       stateRecorder.recordEnergy(pe, ke);
     }
@@ -116,7 +135,13 @@ void P3MMethod::run(const int simLength,
       integerStepVelocitiesToCodeUnits(particles, H, DT);
     }
 
+#ifdef CUDA
+    pmMethod.copyParticlesHostToDevice();
+#endif
     measureTime(pmStep, pmMethod.pmMethodStep());
+#ifdef CUDA
+    pmMethod.copyParticlesDeviceToHost();
+#endif
     measureTime(shortRangeForcesCalc, calculateShortRangeForces(particles));
     measureTime(correctAccelerations, correctAccelerations(particles));
 

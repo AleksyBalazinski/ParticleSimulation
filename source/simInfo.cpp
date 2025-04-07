@@ -75,10 +75,9 @@ float SimInfo::potentialEnergy(const std::vector<std::complex<float>>& gridDensi
                                std::function<float(Vec3)> externalPotential,
                                float H,
                                float DT,
-                               float G,
-                               int gridLength) {
+                               float G) {
   float internal = 0;
-  for (int i = 0; i < gridLength; ++i) {
+  for (int i = 0; i < gridDensity.size(); ++i) {
     internal += densityToOriginalUnits(gridDensity[i].real(), DT, G) *
                 potentialToOriginalUnits(gridPotential[i].real(), H, DT);
   }

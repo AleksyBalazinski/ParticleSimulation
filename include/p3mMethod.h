@@ -1,5 +1,8 @@
 #pragma once
 
+#ifdef CUDA
+#include "PMMethodGPU.h"
+#endif
 #include "chainingMesh.h"
 #include "greensFunctions.h"
 #include "pmMethod.h"
@@ -7,14 +10,19 @@
 
 class P3MMethod {
  public:
-  P3MMethod(PMMethod& pmMethod,
-            std::tuple<float, float, float> compBoxSize,
-            float cutoffRadius,
-            float particleDiameter,
-            float H,
-            float softeningLength,
-            CloudShape cloudShape,
-            bool useSRForceTable = true);
+  P3MMethod(
+#ifdef CUDA
+      PMMethodGPU& pmMethod,
+#else
+      PMMethod& pmMethod,
+#endif
+      std::tuple<float, float, float> compBoxSize,
+      float cutoffRadius,
+      float particleDiameter,
+      float H,
+      float softeningLength,
+      CloudShape cloudShape,
+      bool useSRForceTable = true);
 
   void run(const int simLength,
            bool collectDiagnostics = false,
@@ -37,7 +45,11 @@ class P3MMethod {
   void initSRForceTable();
   void updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Particle>& particles);
 
+#ifdef CUDA
+  PMMethodGPU& pmMethod;
+#else
   PMMethod& pmMethod;
+#endif
   ChainingMesh chainingMesh;
   SimInfo simInfo;
 
