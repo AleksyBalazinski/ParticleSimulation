@@ -92,7 +92,7 @@ void galaxySimulationPM(int n, int simLength) {
 
 #ifdef CUDA
   PMMethodGPU pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
-                 InterpolationScheme::CIC, FiniteDiffScheme::TWO_POINT,
+                 InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
                  GreensFunction::DISCRETE_LAPLACIAN, 0, gridPoints);
 #else
   FFTWAdapter fftAdapter(dims);

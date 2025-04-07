@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(ParticleSimulation LANGUAGES CXX)
 
-option(USE_CUDA "Enable CUDA support" OFF)
+option(USE_CUDA "Enable CUDA support" ON)
 
 if(USE_CUDA)
     message(STATUS "CUDA enabled")

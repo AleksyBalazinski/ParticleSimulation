@@ -249,6 +249,17 @@ void PMMethodGPU::initGreensFunction() {
              cudaMemcpyHostToDevice);
 }
 
+__global__ void spreadMassNGPKernel(GridGPU grid, Particle* particles, int N) {
+  for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < N; idx += blockDim.x * gridDim.x) {
+    const Particle& p = particles[idx];
+    int x = (int)std::round(p.position.x);
+    int y = (int)std::round(p.position.y);
+    int z = (int)std::round(p.position.z);
+
+    grid.assignDensity(x, y, z, p.mass);
+  }
+}
+
 __global__ void spreadMassCICKernel(GridGPU grid, Particle* particles, int N) {
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < N; idx += blockDim.x * gridDim.x) {
     const Particle& p = particles[idx];
@@ -278,13 +289,57 @@ __global__ void spreadMassCICKernel(GridGPU grid, Particle* particles, int N) {
   }
 }
 
+__device__ float TSCAssignmentFunc(float x, int t) {
+  if (t == 1) {
+    return 0.5f * (0.5f + x) * (0.5f + x);
+  }
+  if (t == 0) {
+    return 0.75f - x * x;
+  }
+  if (t == -1) {
+    return 0.5f * (0.5f - x) * (0.5f - x);
+  }
+  return 0;
+}
+
+__global__ void spreadMassTSCKernel(GridGPU grid, Particle* particles, int N) {
+  for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < N; idx += blockDim.x * gridDim.x) {
+    const Particle& p = particles[idx];
+    int x = (int)p.position.x;
+    int y = (int)p.position.y;
+    int z = (int)p.position.z;
+
+    float d = p.mass;
+
+    float dx = p.position.x - x;
+    float dy = p.position.y - y;
+    float dz = p.position.z - z;
+
+    for (int t1 = -1; t1 <= 1; ++t1) {
+      float T1 = (d / 8) * 2 * TSCAssignmentFunc(dx, t1);
+      for (int t2 = -1; t2 <= 1; ++t2) {
+        float T2 = T1 * 2 * TSCAssignmentFunc(dy, t2);
+        for (int t3 = -1; t3 <= 1; ++t3) {
+          float T3 = T2 * 2 * TSCAssignmentFunc(dz, t3);
+          grid.assignDensity(x + t1, y + t2, z + t3, T3);
+        }
+      }
+    }
+  }
+}
+
 void PMMethodGPU::spreadMass() {
   grid.clearDensity();
   switch (is) {
+    case InterpolationScheme::NGP:
+      spreadMassNGPKernel<<<numBlocks(N), BLOCK_SIZE>>>(grid, d_particles, N);
+      break;
     case InterpolationScheme::CIC:
       spreadMassCICKernel<<<numBlocks(N), BLOCK_SIZE>>>(grid, d_particles, N);
       break;
-
+    case InterpolationScheme::TSC:
+      spreadMassTSCKernel<<<numBlocks(N), BLOCK_SIZE>>>(grid, d_particles, N);
+      break;
     default:
       break;
   }
@@ -296,6 +351,13 @@ __device__ Vec3 interpolateField(Vec3 position, GridGPU grid, InterpolationSchem
   float z = position.z;
 
   switch (is) {
+    case InterpolationScheme::NGP: {
+      int xi = (int)std::round(x);
+      int yi = (int)std::round(y);
+      int zi = (int)std::round(z);
+      return grid.getField(xi, yi, zi);
+    }
+
     case InterpolationScheme::CIC: {
       int xi = (int)x;
       int yi = (int)y;
@@ -317,8 +379,32 @@ __device__ Vec3 interpolateField(Vec3 position, GridGPU grid, InterpolationSchem
                  mul(dx * dy * dz, grid.getField(xi + 1, yi + 1, zi + 1)));
     }
 
+    case InterpolationScheme::TSC: {
+      int xi = (int)x;
+      int yi = (int)y;
+      int zi = (int)z;
+      float dx = x - xi;
+      float dy = y - yi;
+      float dz = z - zi;
+
+      Vec3 interpolatedField;
+      for (int t1 = -1; t1 <= 1; ++t1) {
+        float T1 = 2 * TSCAssignmentFunc(dx, t1);
+        for (int t2 = -1; t2 <= 1; ++t2) {
+          float T2 = T1 * 2 * TSCAssignmentFunc(dy, t2);
+          for (int t3 = -1; t3 <= 1; ++t3) {
+            float T3 = T2 * 2 * TSCAssignmentFunc(dz, t3);
+            increment(interpolatedField,
+                      mul(0.125f * T3, grid.getField(xi + t1, yi + t2, zi + t3)));
+          }
+        }
+      }
+
+      return interpolatedField;
+    }
+
     default:
-      return makeVec3(-1, -2, -3);
+      return Vec3(0, 0, 0);
   }
 }
 
@@ -353,7 +439,6 @@ __device__ Vec3 getFieldInCell(int x, int y, int z, FiniteDiffScheme fds, GridGP
     fieldZ = (-1.0f / 12) * (-grid.getPotential(x, y, z + 2) + 8 * grid.getPotential(x, y, z + 1) -
                              8 * grid.getPotential(x, y, z - 1) + grid.getPotential(x, y, z - 2));
   } else {
-    // throw std::invalid_argument("Unknown finite difference type.");
   }
 
   return Vec3(fieldX, fieldY, fieldZ);
@@ -374,16 +459,15 @@ void PMMethodGPU::findFieldInCells() {
   findFieldInCellsKernel<<<numBlocks(grid.getLength()), BLOCK_SIZE>>>(grid, fds);
 }
 
-struct SphRadDecrFieldParams {
-  __host__ __device__ SphRadDecrFieldParams(Vec3 center, float r, float m, float G)
-      : center(center), r(r), m(m), G(G) {}
+struct UniDecrFieldParams {
+  UniDecrFieldParams(Vec3 center, float r, float m, float G) : center(center), r(r), m(m), G(G) {}
   Vec3 center;
   float r;
   float m;
   float G;
 };
 
-__device__ Vec3 sphRadDecrField(Vec3 pos, SphRadDecrFieldParams params) {
+__device__ Vec3 sphRadDecrField(Vec3 pos, UniDecrFieldParams params) {
   auto bulge = params.center;
   auto mb = params.m;
   auto rb = params.r;
@@ -405,7 +489,7 @@ __global__ void updateAccelerationsKernel(Particle* particles,
                                           int N,
                                           GridGPU grid,
                                           InterpolationScheme is,
-                                          SphRadDecrFieldParams params,
+                                          UniDecrFieldParams params,
                                           float H,
                                           float DT) {
   for (int idx = threadIdx.x + blockDim.x * blockIdx.x; idx < N; idx += blockDim.x * gridDim.x) {
@@ -418,6 +502,6 @@ __global__ void updateAccelerationsKernel(Particle* particles,
 }
 
 void PMMethodGPU::updateAccelerations() {
-  SphRadDecrFieldParams params(Vec3(30, 30, 15), 3.0f, 60.0f, 4.5e-3f);  // TODO
+  UniDecrFieldParams params(Vec3(30, 30, 15), 3.0f, 60.0f, 4.5e-3f);  // TODO
   updateAccelerationsKernel<<<numBlocks(N), BLOCK_SIZE>>>(d_particles, N, grid, is, params, H, DT);
 }

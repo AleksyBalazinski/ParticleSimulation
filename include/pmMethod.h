@@ -57,6 +57,7 @@ class PMMethod {
   void findFourierPotential();
   void findFieldInCells();
   void updateAccelerations();
+  static float TSCAssignmentFunc(float x, int t);
 
   Grid& grid;
   float effectiveBoxSizeX;

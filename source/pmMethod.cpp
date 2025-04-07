@@ -196,7 +196,7 @@ void PMMethod::initGreensFunction() {
   });
 }
 
-float TSCAssignmentFunc(float x, int t) {
+float PMMethod::TSCAssignmentFunc(float x, int t) {
   if (t == 1) {
     return 0.5f * (0.5f + x) * (0.5f + x);
   }
