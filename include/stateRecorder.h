@@ -42,7 +42,7 @@ class StateRecorder {
   std::string momentumStr;
   std::string expectedMomentumStr;
   std::string angularMomentumStr;
-  std::string fieldStr;
+  std::vector<Vec3> fieldBuf;
 
   std::ofstream positionsFile;
   std::ofstream energyFile;

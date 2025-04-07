@@ -62,7 +62,7 @@ void P3MMethod::run(const int simLength,
                     const char* expectedMomentumPath,
                     const char* angularMomentumPath) {
   std::vector<Particle>& particles = pmMethod.getParticles();
-  StateRecorder stateRecorder(positionsPath, int(pmMethod.getParticles().size()), simLength,
+  StateRecorder stateRecorder(positionsPath, int(pmMethod.getParticles().size()), simLength + 1,
                               energyPath, momentumPath, expectedMomentumPath, angularMomentumPath,
                               "");
   float H = pmMethod.getH();
@@ -293,14 +293,14 @@ void P3MMethod::updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Par
         continue;
       }
 
-      for (auto node = chainingMesh.getParticlesInCell(q); node != chainingMesh.listEnd();
-           node = particles[node].HOCNext) {
-        for (auto nodeN = chainingMesh.getParticlesInCell(qn); nodeN != chainingMesh.listEnd();
-             nodeN = particles[nodeN].HOCNext) {
-          if (particles[nodeN].position.y - particles[node].position.y > cutoffRadius) {
+      for (auto node = chainingMesh.getParticlesInCell(q); node != nullptr; node = node->next) {
+        for (auto nodeN = chainingMesh.getParticlesInCell(qn); nodeN != nullptr;
+             nodeN = nodeN->next) {
+          if (particles[nodeN->particleId].position.y - particles[node->particleId].position.y >
+              cutoffRadius) {
             break;
           }
-          updateSRForces(node, nodeN, q, qn, i, particles);
+          updateSRForces(node->particleId, nodeN->particleId, q, qn, i, particles);
         }
       }
     }

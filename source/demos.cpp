@@ -169,7 +169,7 @@ void smallSimPP() {
   float DT = 1;
   float G = 4.5e-3f;
 
-  ppMethodLeapfrog(state, masses, simLength, DT, G, "output-pp.txt");
+  ppMethodLeapfrog(state, masses, simLength, DT, G, "output.dat");
 }
 
 void bigSimPP() {
@@ -183,10 +183,11 @@ void bigSimPP() {
   float DT = 1;
   float G = 4.5e-3f;
 
-  ppMethodLeapfrog(state, masses, simLength, DT, G, "output-pp.txt");
+  ppMethodLeapfrog(state, masses, simLength, DT, G, "output.dat");
 }
 
 void smallSimP3M() {
+#ifndef CUDA
   const int n = 3;
   std::vector<float> masses = {20, 5, 1e2};
   std::vector<Vec3> state = {
@@ -207,20 +208,15 @@ void smallSimP3M() {
   float DT = 1;
   auto externalField = [](Vec3 pos) -> Vec3 { return Vec3::zero(); };
   auto externalPotential = [](Vec3 pos) -> float { return 0; };
-  float a = 7.5f;
+  float a = 4 * H;
 
-#ifdef CUDA
-  PMMethodGPU pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
-                 InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
-                 GreensFunction::DISCRETE_LAPLACIAN, 0, gridPoints);
-#else
   PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
               InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL, a,
               grid);
-#endif
 
   float re = 0.7f * a;
   float softeningLength = 0.5f;
   P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S1);
-  p3m.run(simLength, true /*diagnostics*/, "output-p3m.txt");
+  p3m.run(simLength, true /*diagnostics*/, "output.dat");
+#endif
 }

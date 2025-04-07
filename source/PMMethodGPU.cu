@@ -88,7 +88,7 @@ std::string PMMethodGPU::run(const int simLength,
   createCudaEvents(findFieldInCells);
   createCudaEvents(updateAccelerations);
 
-  StateRecorder stateRecorder(positionsPath, N, simLength, energyPath, momentumPath,
+  StateRecorder stateRecorder(positionsPath, N, simLength + 1, energyPath, momentumPath,
                               expectedMomentumPath, angularMomentumPath, fieldPath);
   SimInfo simInfo;
 

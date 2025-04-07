@@ -45,7 +45,7 @@ g_z = last_field[:, 2]
 r = (x - 30)
 expected_g_x = G* m/r**2
 H = 1.875
-a = 2.5 * H
+a = 4 * H
 smoothed_g_x = s1_smoothed_g(r, a)
 
 fig = plt.figure()

@@ -24,14 +24,23 @@ StateRecorder::StateRecorder(const char* positionsPath,
       momentumFile(momentumPath, std::ofstream::trunc),
       expectedMomentumFile(expectedMomentumPath, std::ofstream::trunc),
       angularMomentumFile(angularMomentumPath, std::ofstream::trunc),
-      fieldFile(fieldPath, std::ofstream::trunc),
       vecBuf(new char[vecBufSize]),
       singleBuf(new char[singleBufSize]) {
-  std::ofstream clearFile(positionsPath, std::ios::trunc);
+  {
+    std::ofstream clearFile(positionsPath, std::ios::trunc);
+  }
 
   positionsFile.open(positionsPath, std::ios::binary | std::ios::app);
   positionsFile.write(reinterpret_cast<char*>(&this->particlesCnt), sizeof(int));
   positionsFile.write(reinterpret_cast<char*>(&this->framesCnt), sizeof(int));
+
+  {
+    std::ofstream clearFile(fieldPath, std::ios::trunc);
+  }
+
+  fieldFile.open(fieldPath, std::ios::binary | std::ios::app);
+  fieldFile.write(reinterpret_cast<char*>(&this->particlesCnt), sizeof(int));
+  fieldFile.write(reinterpret_cast<char*>(&this->framesCnt), sizeof(int));
 }
 
 StateRecorder::~StateRecorder() {
@@ -50,8 +59,6 @@ void StateRecorder::recordPositions(std::vector<Vec3>::iterator begin,
 }
 
 void StateRecorder::recordPositions(const std::vector<Particle>& particles) {
-  particlesCnt = int(particles.size());
-  ++framesCnt;
   for (const auto& p : particles) {
     positionsBuf.emplace_back(p.position.x, p.position.y, p.position.z);
     ++positionsRecordsCnt;
@@ -91,13 +98,10 @@ void StateRecorder::recordTotalAngularMomentum(Vec3 angularMomentum) {
 
 void StateRecorder::recordField(const std::vector<Particle>& particles, float H, float DT) {
   for (const auto& p : particles) {
-    fieldStr += accelerationToOriginalUnits(p.acceleration, H, DT)
-                    .toString(singleBuf.get(), singleBufSize, vecBuf.get(), vecBufSize);
-    fieldStr += '\n';
+    fieldBuf.push_back(accelerationToOriginalUnits(p.acceleration, H, DT));
     ++fieldRecordsCnt;
-    saveIfLimitHit(fieldFile, fieldStr, fieldRecordsCnt);
+    saveIfLimitHitBin(fieldFile, fieldBuf, fieldRecordsCnt);
   }
-  fieldStr += "\n\n";
 }
 
 std::string StateRecorder::flush() {
@@ -107,7 +111,7 @@ std::string StateRecorder::flush() {
   momentumFile << momentumStr;
   expectedMomentumFile << expectedMomentumStr;
   angularMomentumFile << angularMomentumStr;
-  fieldFile << fieldStr;
+  fieldFile.write(reinterpret_cast<char*>(fieldBuf.data()), fieldBuf.size() * sizeof(Vec3));
 
   std::filesystem::path cwd = std::filesystem::current_path();
   return cwd.string();

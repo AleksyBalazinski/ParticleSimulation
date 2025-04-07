@@ -67,7 +67,7 @@ std::string PMMethod::run(const int simLength,
                           const char* expectedMomentumPath,
                           const char* angularMomentumPath,
                           const char* fieldPath) {
-  StateRecorder stateRecorder(positionsPath, N, simLength, energyPath, momentumPath,
+  StateRecorder stateRecorder(positionsPath, N, simLength + 1, energyPath, momentumPath,
                               expectedMomentumPath, angularMomentumPath, fieldPath);
   SimInfo simInfo;
 

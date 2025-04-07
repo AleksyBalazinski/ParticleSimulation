@@ -4,7 +4,7 @@ import os
 import sys
 from load_data import *
 
-frames = load_data(r"C:\Projects\ParticleSimulation\build\source\Release\output.txt")
+frames = load_data(sys.argv[1])
 print(f"x: ({pos_min[0]}, {pos_max[0]}), y: ({pos_min[1]}, {pos_max[1]}), z: ({pos_min[2]}, {pos_max[2]})")
 fig = plt.figure(figsize=(8, 8))
 ax = fig.add_subplot(111)
