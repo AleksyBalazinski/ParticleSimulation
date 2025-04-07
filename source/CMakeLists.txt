@@ -73,9 +73,6 @@ endif()
 
 target_link_libraries(ParticleSimulation 
     PRIVATE kissfft
-    PRIVATE glfw
-    PRIVATE libglew_static
-    PRIVATE glm
 	PRIVATE ${FFTW_LIB}
 )
 
