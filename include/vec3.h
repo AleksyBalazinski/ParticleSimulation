@@ -11,6 +11,8 @@ struct Vec3 {
 
   Vec3& operator+=(const Vec3 other);
 
+  Vec3& operator/=(float s);
+
   Vec3 cross(const Vec3 other) const;
 
   float getMagnitude() const;

@@ -11,6 +11,7 @@ add_executable(
     unit_tests
     RK4Test.cpp
     fftAdaptersTest.cpp
+    barnesHutTest.cpp
     )
 
 target_link_libraries(unit_tests

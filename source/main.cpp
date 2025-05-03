@@ -9,11 +9,12 @@ int main() {
 #endif
   try {
     // smallSimPP();
-    // bigSimPP();
-    // smallSimP3M();
-    // probeField();
-    // galaxySimulationP3M(int(5e4), 200);
-    galaxySimulationPM(int(5e4), 200);
+    //   bigSimPP();
+    //   smallSimP3M();
+    //   probeField();
+    //   galaxySimulationP3M(int(5e4), 200);
+    //   galaxySimulationPM(int(5e4), 200);
+    barnesHut();
   } catch (const std::exception& e) {
     std::cerr << e.what() << '\n';
   }

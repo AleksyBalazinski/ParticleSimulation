@@ -2,6 +2,8 @@
 #ifdef CUDA
 #include "PMMethodGPU.h"
 #endif
+#include "barnesHut.h"
+#include "demos.h"
 #include "diskSamplerLinear.h"
 #include "externalFields.h"
 #include "grid.h"
@@ -219,4 +221,20 @@ void smallSimP3M() {
   P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S1);
   p3m.run(simLength, true /*diagnostics*/, "output.dat");
 #endif
+}
+
+void barnesHut() {
+  std::vector<float> masses = {20, 5, 1e2};
+  std::vector<Vec3> state = {
+      Vec3(30, 30, 15), Vec3(45, 32, 15),  Vec3(30, 10, 15),  // positions
+      Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3::zero()       // velocities
+  };
+  Vec3 low(0, 0, 0);
+  float H = 60;
+  float DT = 1;
+  float G = 4.5e-3f;
+
+  int simLength = 100;
+  BH::BarnesHut bhSimulation(state, masses, low, H, G);
+  bhSimulation.run(simLength, DT);
 }
