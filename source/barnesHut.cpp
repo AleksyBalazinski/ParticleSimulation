@@ -3,6 +3,7 @@
 #include <cmath>
 #include <execution>
 #include <iostream>
+#include <ranges>
 #include "simInfo.h"
 #include "stateRecorder.h"
 
@@ -135,6 +136,34 @@ void findForce(const Node* root, Particle& p, float theta, float G, float eps) {
   }
 }
 
+float gravPotential(Vec3 r1, float m1, Vec3 r2, float m2, float G, float eps) {
+  return -1 * G * m1 * m2 / std::sqrtf((r2 - r1).getMagnitudeSquared() + eps * eps);
+}
+
+void findPE(const Node* root,
+            int i,
+            const std::vector<Particle>& particles,
+            float theta,
+            float G,
+            float eps,
+            std::vector<float>& PEs) {
+  const Particle& p = particles[i];
+  if (root->children[0] == nullptr) {  // external node
+    if (root->p != nullptr && root->p != &p) {
+      PEs[i] += gravPotential(root->p->position, root->p->mass, p.position, p.mass, G, eps);
+    }
+    return;
+  }
+  // internal node
+  if (root->H / dist(root->COM, p.position) < theta) {
+    PEs[i] += gravPotential(root->COM, root->M, p.position, p.mass, G, eps);
+    return;
+  }
+  for (const Node* c : root->children) {
+    findPE(c, i, particles, theta, G, eps, PEs);
+  }
+}
+
 Vec3 gravity(Vec3 r1, float m1, Vec3 r2, float G, float eps) {
   Vec3 r21 = r2 - r1;
   Vec3 g21 = -1 * G * m1 / std::powf(r21.getMagnitudeSquared() + eps * eps, 1.5f) * r21;
@@ -178,6 +207,7 @@ BarnesHut::BarnesHut(const std::vector<Vec3>& state,
     : N(int(masses.size())),
       externalField(externalField),
       externalPotential(externalPotential),
+      PEContributions(N),
       low(low),
       H(H),
       G(G),
@@ -211,10 +241,8 @@ void BarnesHut::run(int simLength, float dt) {
     stateRecorder.recordExpectedMomentum(expectedMomentum);
     stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
     stateRecorder.recordTotalAngularMomentum(SimInfo::totalAngularMomentum(particles));
-    float pe = 0.0f;  // TODO n^2 complexity for naive computation -> borrow a grid from PM or
-    // approximate from tree ??
     float ke = SimInfo::kineticEnergy(particles);
-    stateRecorder.recordEnergy(pe, ke);
+    stateRecorder.recordEnergy(PE, ke);
 
     if (escapedBox()) {
       std::cout << "particle escaped box\n";
@@ -245,6 +273,7 @@ void BarnesHut::doStep() {
   clearAccelerations();
   Tree tree(particles, low, H);
   calculateAccelerations(tree);
+  PE = calculatePE(tree);
 }
 
 bool isWithinBox(Vec3 pos, Vec3 low, float H) {
@@ -261,6 +290,19 @@ Vec3 BH::BarnesHut::totalExternalForce() {
   return std::transform_reduce(
       std::execution::par, particles.begin(), particles.end(), Vec3::zero(), std::plus<>(),
       [this](const Particle& p) { return p.mass * externalField(p.position); });
+}
+
+float BarnesHut::calculatePE(const Tree& tree) {
+  const auto nRange = std::views::iota(0, N);
+  std::fill(std::execution::par, PEContributions.begin(), PEContributions.end(), 0.0f);
+  std::for_each(std::execution::par, nRange.begin(), nRange.end(), [this, &tree](int i) {
+    findPE(tree.getRoot(), i, particles, theta, G, eps, PEContributions);
+    Particle& p = particles[i];
+    PEContributions[i] /= 2;
+    PEContributions[i] += p.mass * externalPotential(p.position);
+  });
+
+  return std::reduce(std::execution::par, PEContributions.begin(), PEContributions.end());
 }
 
 }  // namespace BH

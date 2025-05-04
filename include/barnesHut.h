@@ -70,12 +70,15 @@ class BarnesHut {
   bool escapedBox();
 
   Vec3 totalExternalForce();
+  float calculatePE(const Tree& t);
 
   int N;
   std::vector<Particle> particles;
 
   std::function<Vec3(Vec3)> externalField;
   std::function<float(Vec3)> externalPotential;
+  std::vector<float> PEContributions;
+  float PE;
 
   Vec3 low;
   float H;
