@@ -12,4 +12,6 @@ void bigSimPP();
 
 void smallSimP3M();
 
+void barnesHutSmall();
+
 void barnesHut();

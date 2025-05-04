@@ -3,25 +3,19 @@
 #include <cmath>
 #include <execution>
 #include <iostream>
+#include "simInfo.h"
 #include "stateRecorder.h"
 
 namespace BH {
 
 int nodeID = 0;
 
-// Particle::Particle(Vec3 position, Vec3 velocity, float mass)
-//     : position(position), velocity(velocity), mass(mass) {}
-
-Node::Node(Vec3 low, float H, Particle* p) : low(low), H(H), p(p), COM(), M(0.0f) {
+Node::Node(Vec3 low, float H, Particle* p)
+    : low(low), H(H), p(p), COM(), M(0.0f), children({nullptr}) {
   id = nodeID++;
-  for (int i = 0; i < 8; ++i) {
-    children[i] = nullptr;
-  }
 }
 
-Node::~Node() {
-  // std::cout << "removing " << id << '\n';
-}
+Node::~Node() {}
 
 Tree::Tree(const std::vector<Particle>& particles, Vec3 low, float H) {
   root = new Node(low, H);
@@ -86,9 +80,9 @@ int getChildId(Node* root, const Particle& p) {
 }
 
 void updateInternalNode(Node* node, const Particle& p) {
-  node->COM = node->M * node->COM + p.mass * p.position;
-  node->M += p.mass;
-  node->COM /= node->M;
+  float totalMass = node->M + p.mass;
+  node->COM = (node->M * node->COM + p.mass * p.position) / totalMass;
+  node->M = totalMass;
 }
 
 void DFSFree(Node* root) {
@@ -124,26 +118,27 @@ void DFSPrint(Node* root) {
   }
 }
 
-void findForce(const Node* root, Particle& p, float threshold, float G) {
+void findForce(const Node* root, Particle& p, float theta, float G, float eps) {
   if (root->children[0] == nullptr) {  // external node
     if (root->p != nullptr && root->p != &p) {
-      p.acceleration += gravity(root->p->position, root->p->mass, p.position, p.mass, G) / p.mass;
+      p.acceleration += gravity(root->p->position, root->p->mass, p.position, G, eps);
     }
     return;
   }
   // internal node
-  if (dist(root->COM, p.position) / root->H > threshold) {
-    p.acceleration += gravity(root->COM, root->M, p.position, p.mass, G) / p.mass;
+  if (root->H / dist(root->COM, p.position) < theta) {
+    p.acceleration += gravity(root->COM, root->M, p.position, G, eps);
     return;
   }
   for (const Node* c : root->children) {
-    findForce(c, p, threshold, G);
+    findForce(c, p, theta, G, eps);
   }
 }
 
-Vec3 gravity(Vec3 r1, float m1, Vec3 r2, float m2, float G) {
+Vec3 gravity(Vec3 r1, float m1, Vec3 r2, float G, float eps) {
   Vec3 r21 = r2 - r1;
-  return -1 * G * m1 * m2 / std::powf(r21.getMagnitude() + 0.01f, 3.0f) * r21;
+  Vec3 g21 = -1 * G * m1 / std::powf(r21.getMagnitudeSquared() + eps * eps, 1.5f) * r21;
+  return g21;
 }
 
 float dist(Vec3 a, Vec3 b) {
@@ -173,10 +168,21 @@ void updatePositions(std::vector<Particle>& particles, float dt) {
 
 BarnesHut::BarnesHut(const std::vector<Vec3>& state,
                      const std::vector<float>& masses,
+                     std::function<Vec3(Vec3)> externalField,
+                     std::function<float(Vec3)> externalPotential,
                      Vec3 low,
                      float H,
-                     float G)
-    : N(int(masses.size())), low(low), H(H), G(G) {
+                     float G,
+                     float softeningLength,
+                     float theta)
+    : N(int(masses.size())),
+      externalField(externalField),
+      externalPotential(externalPotential),
+      low(low),
+      H(H),
+      G(G),
+      eps(softeningLength),
+      theta(theta) {
   for (int i = 0; i < N; ++i) {
     this->particles.emplace_back(state[i], state[N + i], masses[i]);
   }
@@ -185,42 +191,54 @@ BarnesHut::BarnesHut(const std::vector<Vec3>& state,
 BarnesHut::~BarnesHut() {}
 
 void BarnesHut::run(int simLength, float dt) {
-  bool withinBox = true;
-  StateRecorder stateRecorder("output.dat", N, simLength + 1, "", "", "", "", "");
+  StateRecorder stateRecorder("output.dat", N, simLength + 1, "energy.txt", "momentum.txt",
+                              "expected_momentum.txt", "angular_momentum.txt", "");
+  SimInfo simInfo;
+  simInfo.setInitialMomentum(particles);
 
-  setHalfStepVelocities(particles, dt);
   doStep();
+  setHalfStepVelocities(particles, dt);
+
   for (int t = 0; t <= simLength; ++t) {
     std::cout << "progress: " << float(t) / simLength << '\r';
     std::cout.flush();
 
     updatePositions(particles, dt);
+    setIntegerStepVelocities(particles);
+
     stateRecorder.recordPositions(particles);
+    auto expectedMomentum = simInfo.updateExpectedMomentum(totalExternalForce(), dt);
+    stateRecorder.recordExpectedMomentum(expectedMomentum);
+    stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
+    stateRecorder.recordTotalAngularMomentum(SimInfo::totalAngularMomentum(particles));
+    float pe = 0.0f;  // TODO n^2 complexity for naive computation -> borrow a grid from PM or
+    // approximate from tree ??
+    float ke = SimInfo::kineticEnergy(particles);
+    stateRecorder.recordEnergy(pe, ke);
+
     if (escapedBox()) {
-      withinBox = false;
+      std::cout << "particle escaped box\n";
       break;
     }
 
     doStep();
     updateVelocities(particles, dt);
   }
-  if (!withinBox) {
-    std::cout << "particle escaped box\n";
-  } else {
-    stateRecorder.flush();
-  }
+
+  stateRecorder.flush();
 }
 
 void BarnesHut::clearAccelerations() {
-  for (auto& p : particles) {
-    p.acceleration = Vec3();
-  }
+  std::for_each(std::execution::par, particles.begin(), particles.end(),
+                [](Particle& p) { p.acceleration = Vec3::zero(); });
 }
 
 void BarnesHut::calculateAccelerations(const Tree& tree) {
-  for (auto& p : particles) {
-    findForce(tree.getRoot(), p, 1, G);  // TODO variable threshold
-  }
+  std::for_each(std::execution::par, particles.begin(), particles.end(),
+                [this, &tree](Particle& p) {
+                  findForce(tree.getRoot(), p, theta, G, eps);
+                  p.acceleration += externalField(p.position);
+                });
 }
 
 void BarnesHut::doStep() {
@@ -237,6 +255,12 @@ bool isWithinBox(Vec3 pos, Vec3 low, float H) {
 bool BarnesHut::escapedBox() {
   return std::any_of(particles.begin(), particles.end(),
                      [this](const Particle& p) { return !isWithinBox(p.position, low, H); });
+}
+
+Vec3 BH::BarnesHut::totalExternalForce() {
+  return std::transform_reduce(
+      std::execution::par, particles.begin(), particles.end(), Vec3::zero(), std::plus<>(),
+      [this](const Particle& p) { return p.mass * externalField(p.position); });
 }
 
 }  // namespace BH

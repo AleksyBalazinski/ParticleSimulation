@@ -1,21 +1,12 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <vector>
 #include "particle.h"
 #include "vec3.h"
 
 namespace BH {
-
-// struct Particle {
-//   Vec3 position;
-//   Vec3 velocity;
-//   Vec3 acceleration;
-//   float mass;
-//   Vec3 integerStepVelocity;
-
-//   Particle(Vec3 position, Vec3 velocity, float mass);
-// };
 
 struct Node {
   Node(Vec3 low, float H, Particle* p = nullptr);
@@ -36,8 +27,8 @@ void updateInternalNode(Node* node, const Particle& p);
 void DFSFree(Node* root);
 void DFSPrint(Node* root);
 
-void findForce(const Node* root, Particle& p, float threshold, float G);
-Vec3 gravity(Vec3 r1, float m1, Vec3 r2, float m2, float G);
+void findForce(const Node* root, Particle& p, float theta, float G, float eps);
+Vec3 gravity(Vec3 r1, float m1, Vec3 r2, float G, float eps);
 float dist(Vec3 a, Vec3 b);
 
 void setHalfStepVelocities(std::vector<Particle>& particles, float dt = 1.0f);
@@ -60,9 +51,13 @@ class BarnesHut {
  public:
   BarnesHut(const std::vector<Vec3>& state,
             const std::vector<float>& masses,
+            std::function<Vec3(Vec3)> externalField,
+            std::function<float(Vec3)> externalPotential,
             Vec3 low,
             float H,
-            float G);
+            float G,
+            float softeningLength,
+            float theta);
   ~BarnesHut();
 
   void run(int simLength, float dt);
@@ -74,11 +69,19 @@ class BarnesHut {
 
   bool escapedBox();
 
+  Vec3 totalExternalForce();
+
   int N;
   std::vector<Particle> particles;
+
+  std::function<Vec3(Vec3)> externalField;
+  std::function<float(Vec3)> externalPotential;
+
   Vec3 low;
   float H;
   float G;
+  float eps;
+  float theta;
 };
 
 }  // namespace BH

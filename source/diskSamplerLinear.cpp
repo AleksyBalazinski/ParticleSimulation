@@ -5,6 +5,8 @@
 
 DiskSamplerLinear::DiskSamplerLinear() : re(std::random_device{}()) {}
 
+DiskSamplerLinear::DiskSamplerLinear(unsigned int seed) : re(seed) {}
+
 std::vector<Vec3> DiskSamplerLinear::sample(Vec3 center,
                                             float rb,
                                             float mb,

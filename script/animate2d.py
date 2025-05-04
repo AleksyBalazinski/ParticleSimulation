@@ -22,8 +22,8 @@ def update(frame_num):
     ax.set_ylim(0, 60)
     ax.set_xlabel('x (kpc)')
     ax.set_ylabel('y (kpc)')
-    ax.text(45, 55, f'Time: {frame_num * time_step} Myr', fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
-    scat = ax.scatter(frames[frame_num][:, 0], frames[frame_num][:, 1], color='blue', alpha=0.5, s=0.1)
+    ax.text(45, 55, f'Time: {frame_num * time_step} Myr', fontsize=10, bbox=dict(facecolor='white', alpha=0.4))
+    scat = ax.scatter(frames[frame_num][:, 0], frames[frame_num][:, 1], color='blue', alpha=0.4, s=0.1)
     return scat,
 
 ani = animation.FuncAnimation(fig, update, frames=len(frames), interval=100)
