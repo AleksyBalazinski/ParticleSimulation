@@ -6,6 +6,7 @@
 class DiskSamplerLinear {
  public:
   DiskSamplerLinear();
+  DiskSamplerLinear(unsigned int seed);
 
   std::vector<Vec3>
   sample(Vec3 center, float rb, float mb, float rd, float md, float thickness, float G, int n);

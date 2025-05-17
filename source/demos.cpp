@@ -2,6 +2,8 @@
 #ifdef CUDA
 #include "PMMethodGPU.h"
 #endif
+#include "barnesHut.h"
+#include "demos.h"
 #include "diskSamplerLinear.h"
 #include "externalFields.h"
 #include "grid.h"
@@ -219,4 +221,55 @@ void smallSimP3M() {
   P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S1);
   p3m.run(simLength, true /*diagnostics*/, "output.dat");
 #endif
+}
+
+void barnesHutSmall() {
+  std::vector<float> masses = {20, 5, 1e2};
+  std::vector<Vec3> state = {
+      Vec3(30, 30, 15), Vec3(45, 32, 15),  Vec3(30, 10, 15),  // positions
+      Vec3(0.1f, 0, 0), Vec3(-0.3f, 0, 0), Vec3::zero()       // velocities
+  };
+  Vec3 low(0, 0, 0);
+  float H = 60;
+  float DT = 1;
+  float G = 4.5e-3f;
+  auto externalField = [](Vec3 pos) -> Vec3 { return Vec3::zero(); };
+  auto externalPotential = [](Vec3 pos) -> float { return 0; };
+
+  int simLength = 100;
+  BH::BarnesHut bhSimulation(state, masses, externalField, externalPotential, low, H, G, 1.5f,
+                             0.5f);
+  bhSimulation.run(simLength, DT);
+}
+
+void barnesHut() {
+  Vec3 galaxyCenter = Vec3(30, 30, 15);
+  float rb = 3.0f;
+  float mb = 60.0f;
+  float rd = 15.0f;
+  float md = 15.0f;
+  float thickness = 0.3f;
+  float G = 4.5e-3f;
+  int n = int(5e4);
+
+  DiskSamplerLinear diskSampler;
+  std::vector<Vec3> state = diskSampler.sample(galaxyCenter, rb, mb, rd, md, thickness, G, n);
+  std::vector<float> masses(n, md / n);
+  auto externalField = [galaxyCenter, rb, mb, G](Vec3 pos) -> Vec3 {
+    return sphRadDecrField(pos, galaxyCenter, rb, mb, G);
+  };
+  auto externalPotential = [galaxyCenter, rb, mb, G](Vec3 pos) -> float {
+    return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
+  };
+
+  Vec3 low(0, 0, 0);
+  float H = 60;
+  float DT = 1;
+  int simLength = 200;
+  float softeningLength = 1.5f;
+  float theta = 1.0f;
+
+  BH::BarnesHut bhSimulation(state, masses, externalField, externalPotential, low, H, G,
+                             softeningLength, theta);
+  bhSimulation.run(simLength, DT);
 }

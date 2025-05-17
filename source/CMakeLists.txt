@@ -18,6 +18,7 @@
 	greensFunctions.cpp
 	demos.cpp
 	FFTWAdapter.cpp
+	barnesHut.cpp
 )
 
 if(USE_CUDA)
@@ -87,6 +88,7 @@ target_sources(ParticleSimulationLib
 	vec3.cpp
 	stateRecorder.cpp
 	ppMethod.cpp
+	barnesHut.cpp
 )
 
 target_include_directories(ParticleSimulationLib
