@@ -14,13 +14,14 @@ std::vector<Vec3> DiskSamplerLinear::sample(Vec3 center,
                                             float md,
                                             float thickness,
                                             float G,
-                                            int n) {
+                                            int n,
+                                            float r0) {
   std::uniform_real_distribution<float> u(0, 1);
   std::vector<Vec3> state(2 * n);
 
   for (int i = 0; i < n; ++i) {
     float phi = u(re) * 2 * std::numbers::pi_v<float>;
-    float r = sampleFromLinear(rd);
+    float r = sampleFromLinear(rd, r0);
 
     float x = r * std::cos(phi);
     float y = r * std::sin(phi);
@@ -63,11 +64,11 @@ Vec3 DiskSamplerLinear::getVelocity(Vec3 pos,
   return Vec3(-v * rVec.y / rho, v * rVec.x / rho, 0);
 }
 
-float DiskSamplerLinear::sampleFromLinear(float rd) {
+float DiskSamplerLinear::sampleFromLinear(float rd, float r0) {
   std::uniform_real_distribution<float> u(0, 1);
 
   float cdf = u(re);
-  auto f = [rd, cdf, this](float r) { return implicitInvCDFLinear(r, rd, cdf); };
+  auto f = [rd, cdf, r0, this](float r) { return implicitInvCDFLinear(r, rd, cdf, r0); };
   auto df = [rd, this](float r) { return implicitInvCDFLinearDer(r, rd); };
   return newton(f, df, rd / 2.0f, 100, 0.01f);
 }

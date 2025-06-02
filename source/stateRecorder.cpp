@@ -1,24 +1,26 @@
 #include "stateRecorder.h"
-#include <filesystem>
+#include <iostream>
 #include "unitConversions.h"
 
-StateRecorder::StateRecorder(const char* positionsPath,
-                             int particlesCnt,
+StateRecorder::StateRecorder(int particlesCnt,
                              int framesCnt,
-                             const char* energyPath,
-                             const char* momentumPath,
-                             const char* expectedMomentumPath,
-                             const char* angularMomentumPath,
-                             const char* fieldPath,
+                             const std::filesystem::path& outputDirPath,
+                             const char* positionsFilename,
+                             const char* energyFilename,
+                             const char* momentumFilename,
+                             const char* expectedMomentumFilename,
+                             const char* angularMomentumFilename,
+                             const char* fieldFilename,
                              int maxRecords)
-    : positionsPath(positionsPath),
+    : outputDirPath(outputDirPath),
+      positionsPath(outputDirPath / positionsFilename),
       particlesCnt(particlesCnt),
       framesCnt(framesCnt),
-      energyPath(energyPath),
-      momentumPath(momentumPath),
-      expectedMomentumPath(expectedMomentumPath),
-      angularMomentumPath(angularMomentumPath),
-      fieldPath(fieldPath),
+      energyPath(outputDirPath / energyFilename),
+      momentumPath(outputDirPath / momentumFilename),
+      expectedMomentumPath(outputDirPath / expectedMomentumFilename),
+      angularMomentumPath(outputDirPath / angularMomentumFilename),
+      fieldPath(outputDirPath / fieldFilename),
       maxRecords(maxRecords),
       energyFile(energyPath, std::ofstream::trunc),
       momentumFile(momentumPath, std::ofstream::trunc),
@@ -113,8 +115,7 @@ std::string StateRecorder::flush() {
   angularMomentumFile << angularMomentumStr;
   fieldFile.write(reinterpret_cast<char*>(fieldBuf.data()), fieldBuf.size() * sizeof(Vec3));
 
-  std::filesystem::path cwd = std::filesystem::current_path();
-  return cwd.string();
+  return outputDirPath.string();
 }
 
 void StateRecorder::saveIfLimitHit(std::ofstream& of, std::string& str, int& counter) {

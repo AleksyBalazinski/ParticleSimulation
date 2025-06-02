@@ -3,7 +3,7 @@ import numpy as np
 import sys
 
 # energy
-energy_data = np.loadtxt(sys.argv[1])
+energy_data = np.loadtxt("output/energy.txt")
 ep = energy_data[:, 0]
 ek = energy_data[:, 1]
 e = ep + ek
@@ -18,7 +18,7 @@ plt.ylabel('Energy')
 plt.legend()
 
 # angular momentum
-angular_momentum_data = np.loadtxt(sys.argv[2])
+angular_momentum_data = np.loadtxt("output/angular_momentum.txt")
 l_x = angular_momentum_data[:, 0]
 l_y = angular_momentum_data[:, 1]
 l_z = angular_momentum_data[:, 2]
@@ -31,17 +31,16 @@ plt.ylabel('Angular momentum components')
 plt.legend()
 
 # momentum
-momentum_data = np.loadtxt(sys.argv[3])
+momentum_data = np.loadtxt("output/momentum.txt")
 p_x = momentum_data[:, 0]
 p_y = momentum_data[:, 1]
 p_z = momentum_data[:, 2]
 
 # expected momentum
-if(len(sys.argv) >= 5):
-    expected_momentum_data = np.loadtxt(sys.argv[4])
-    pe_x = expected_momentum_data[:, 0]
-    pe_y = expected_momentum_data[:, 1]
-    pe_z = expected_momentum_data[:, 2]
+expected_momentum_data = np.loadtxt("output/expected_momentum.txt")
+pe_x = expected_momentum_data[:, 0]
+pe_y = expected_momentum_data[:, 1]
+pe_z = expected_momentum_data[:, 2]
 time = np.arange(len(p_x))
 
 plt.figure(3)
@@ -56,7 +55,5 @@ if(len(sys.argv) >= 5):
 plt.xlabel('Time')
 plt.ylabel('Momentum components')
 plt.legend()
-
-
 
 plt.show()

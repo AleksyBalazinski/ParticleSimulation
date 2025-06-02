@@ -1,22 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
-
-def load_data(filename):
-    frames = []
-    with open(filename, 'r') as f:
-        block = []
-        for line in f:
-            if line.strip():
-                position = list(map(float, line.split()))
-                block.append(position)
-            elif block:  # Blank line after a block
-                frames.append(np.array(block))
-                block = []
-        if block:
-            frames.append(np.array(block))
-    print(f"Total frames loaded: {len(frames)}")
-    return frames
+from load_data import *
 
 if __name__ == "__main__":
     frames1 = load_data(sys.argv[1])

@@ -91,3 +91,4 @@ ani = animation.FuncAnimation(
 
 plt.tight_layout()
 plt.show()
+ani.save("quadrilateral_evolution.mp4", writer="ffmpeg", fps=10)

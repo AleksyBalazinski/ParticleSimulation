@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -8,14 +9,15 @@
 
 class StateRecorder {
  public:
-  StateRecorder(const char* positionsPath,
-                int particlesCnt,
+  StateRecorder(int particlesCnt,
                 int framesCnt,
-                const char* energyPath,
-                const char* momentumPath,
-                const char* expectedMomentumPath,
-                const char* angularMomentumPath,
-                const char* fieldPath,
+                const std::filesystem::path& outputDirPath,
+                const char* positionsFile = "positions.dat",
+                const char* energyFile = "energy.txt",
+                const char* momentumFile = "momentum.txt",
+                const char* expectedMomentumFile = "expected_momentum.txt",
+                const char* angularMomentumFile = "angular_momentum.txt",
+                const char* fieldFile = "field.dat",
                 int maxRecords = 500);
   ~StateRecorder();
 
@@ -44,19 +46,20 @@ class StateRecorder {
   std::string angularMomentumStr;
   std::vector<Vec3> fieldBuf;
 
+  std::filesystem::path outputDirPath;
+  std::filesystem::path energyPath;
+  std::filesystem::path momentumPath;
+  std::filesystem::path expectedMomentumPath;
+  std::filesystem::path angularMomentumPath;
+  std::filesystem::path positionsPath;
+  std::filesystem::path fieldPath;
+
   std::ofstream positionsFile;
   std::ofstream energyFile;
   std::ofstream momentumFile;
   std::ofstream expectedMomentumFile;
   std::ofstream angularMomentumFile;
   std::ofstream fieldFile;
-
-  const char* energyPath;
-  const char* momentumPath;
-  const char* expectedMomentumPath;
-  const char* angularMomentumPath;
-  const char* positionsPath;
-  const char* fieldPath;
 
   int energyRecordsCnt = 0;
   int momentumRecordsCnt = 0;

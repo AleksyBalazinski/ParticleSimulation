@@ -17,6 +17,7 @@ def load_data(filename):
     with open(filename, 'rb') as f:
         header = f.read(8)
         particles_cnt, frames_cnt = struct.unpack("<ii", header)
+        print(f"loading {particles_cnt} particles and {frames_cnt} frames")
         total_vectors = particles_cnt * frames_cnt
         total_floats = total_vectors * 3
         float_data = struct.unpack(f"<{total_floats}f", f.read(total_floats * 4))
@@ -33,5 +34,4 @@ def load_data(filename):
                 block = []
             if len(frames) == frames_cnt:
                 break
-    print(len(frames))
     return frames

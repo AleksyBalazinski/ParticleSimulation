@@ -36,7 +36,7 @@ std::vector<Vec3> randomInitialState(int particlesCnt,
 }
 
 std::vector<float> randomMasses(int particlesCnt, std::pair<float, float> massRange) {
-  std::default_random_engine re;
+  std::default_random_engine re(0);
   std::uniform_real_distribution<float> massDist(massRange.first, massRange.second);
 
   std::vector<float> masses(particlesCnt);

@@ -4,7 +4,7 @@
 #include "externalFields.h"
 #include "utils.h"
 
-DiskSampler::DiskSampler() : re(std::random_device{}()) {}
+DiskSampler::DiskSampler(unsigned int seed) : re(seed) {}
 
 std::vector<Vec3> DiskSampler::sample(Vec3 center,
                                       float rb,

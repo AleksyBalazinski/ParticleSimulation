@@ -20,7 +20,6 @@ Node::~Node() {}
 
 Tree::Tree(const std::vector<Particle>& particles, Vec3 low, float H) {
   root = new Node(low, H);
-  createChildren(root->children, low, H);
 
   for (const auto& p : particles) {
     insert(root, p);
@@ -38,6 +37,33 @@ void Tree::print() {
 
 const Node* Tree::getRoot() const {
   return root;
+}
+
+Vec3 operator*(const Mat3x3& m, const Vec3& v) {
+  return {m(0, 0) * v.x + m(0, 1) * v.y + m(0, 2) * v.z,
+          m(1, 0) * v.x + m(1, 1) * v.y + m(1, 2) * v.z,
+          m(2, 0) * v.x + m(2, 1) * v.y + m(2, 2) * v.z};
+}
+
+Mat3x3 outerProd(const Vec3& u, const Vec3& v) {
+  Mat3x3 result;
+  result(0, 0) = u.x * v.x;
+  result(0, 1) = u.x * v.y;
+  result(0, 2) = u.x * v.z;
+
+  result(1, 0) = u.y * v.x;
+  result(1, 1) = u.y * v.y;
+  result(1, 2) = u.y * v.z;
+
+  result(2, 0) = u.z * v.x;
+  result(2, 1) = u.z * v.y;
+  result(2, 2) = u.z * v.z;
+
+  return result;
+}
+
+float dotProd(const Vec3& u, const Vec3& v) {
+  return u.x * v.x + u.y * v.y + u.z * v.z;
 }
 
 void insert(Node* root, const Particle& p) {
@@ -119,7 +145,29 @@ void DFSPrint(Node* root) {
   }
 }
 
-void findForce(const Node* root, Particle& p, float theta, float G, float eps) {
+void calcQ(Node* node) {
+  if (node->children[0] == nullptr) {
+    node->Q = Mat3x3::zero();
+    return;
+  }
+  auto Q = Mat3x3::zero();
+  for (Node* c : node->children) {
+    calcQ(c);
+    Q += c->Q;
+    Vec3 childCOM = c->p == nullptr ? c->COM : c->p->position;
+    float childMass = c->p == nullptr ? c->M : c->p->mass;
+    auto R = childCOM - node->COM;
+    Q += (outerProd(R, R) * 3 - Mat3x3::I() * R.getMagnitudeSquared()) * childMass;
+  }
+  node->Q = Q;
+}
+
+void findForce(const Node* root,
+               Particle& p,
+               float theta,
+               float G,
+               float eps,
+               bool includeQuadrupole) {
   if (root->children[0] == nullptr) {  // external node
     if (root->p != nullptr && root->p != &p) {
       p.acceleration += gravity(root->p->position, root->p->mass, p.position, G, eps);
@@ -129,10 +177,16 @@ void findForce(const Node* root, Particle& p, float theta, float G, float eps) {
   // internal node
   if (root->H / dist(root->COM, p.position) < theta) {
     p.acceleration += gravity(root->COM, root->M, p.position, G, eps);
+    if (includeQuadrupole) {
+      auto rVec = p.position - root->COM;
+      float r = std::sqrtf(rVec.getMagnitudeSquared());
+      p.acceleration += G * (root->Q * rVec / std::powf(r, 5) -
+                             (5 / 2.0f) * dotProd(rVec, root->Q * rVec) * rVec / std::powf(r, 7));
+    }
     return;
   }
   for (const Node* c : root->children) {
-    findForce(c, p, theta, G, eps);
+    findForce(c, p, theta, G, eps, includeQuadrupole);
   }
 }
 
@@ -146,7 +200,8 @@ void findPE(const Node* root,
             float theta,
             float G,
             float eps,
-            std::vector<float>& PEs) {
+            std::vector<float>& PEs,
+            bool includeQuadrupole) {
   const Particle& p = particles[i];
   if (root->children[0] == nullptr) {  // external node
     if (root->p != nullptr && root->p != &p) {
@@ -156,11 +211,17 @@ void findPE(const Node* root,
   }
   // internal node
   if (root->H / dist(root->COM, p.position) < theta) {
-    PEs[i] += gravPotential(root->COM, root->M, p.position, p.mass, G, eps);
+    PEs[i] += gravPotential(root->COM, root->M, p.position, p.mass, G, 0);
+    if (includeQuadrupole) {
+      auto rVec = p.position - root->COM;
+      float r = rVec.getMagnitude();
+      float quadPot = -0.5f * G / std::powf(r, 5) * dotProd(rVec, root->Q * rVec);
+      PEs[i] += quadPot * p.mass;
+    }
     return;
   }
   for (const Node* c : root->children) {
-    findPE(c, i, particles, theta, G, eps, PEs);
+    findPE(c, i, particles, theta, G, eps, PEs, includeQuadrupole);
   }
 }
 
@@ -203,7 +264,8 @@ BarnesHut::BarnesHut(const std::vector<Vec3>& state,
                      float H,
                      float G,
                      float softeningLength,
-                     float theta)
+                     float theta,
+                     bool includeQuadrupole)
     : N(int(masses.size())),
       externalField(externalField),
       externalPotential(externalPotential),
@@ -212,7 +274,8 @@ BarnesHut::BarnesHut(const std::vector<Vec3>& state,
       H(H),
       G(G),
       eps(softeningLength),
-      theta(theta) {
+      theta(theta),
+      includeQuadrupole(includeQuadrupole) {
   for (int i = 0; i < N; ++i) {
     this->particles.emplace_back(state[i], state[N + i], masses[i]);
   }
@@ -220,18 +283,25 @@ BarnesHut::BarnesHut(const std::vector<Vec3>& state,
 
 BarnesHut::~BarnesHut() {}
 
-void BarnesHut::run(int simLength, float dt) {
-  StateRecorder stateRecorder("output.dat", N, simLength + 1, "energy.txt", "momentum.txt",
-                              "expected_momentum.txt", "angular_momentum.txt", "");
+void BarnesHut::run(StateRecorder& stateRecorder,
+                    const int simLength,
+                    float dt,
+                    bool collectDiagnostics,
+                    bool recordField) {
   SimInfo simInfo;
   simInfo.setInitialMomentum(particles);
 
   doStep();
+
   setHalfStepVelocities(particles, dt);
 
   for (int t = 0; t <= simLength; ++t) {
-    std::cout << "progress: " << float(t) / simLength << '\r';
+    std::cout << "progress: " << t << "/" << simLength << '\r';
     std::cout.flush();
+
+    if (recordField) {
+      stateRecorder.recordField(particles, 1, 1);
+    }
 
     updatePositions(particles, dt);
     setIntegerStepVelocities(particles);
@@ -264,7 +334,7 @@ void BarnesHut::clearAccelerations() {
 void BarnesHut::calculateAccelerations(const Tree& tree) {
   std::for_each(std::execution::par, particles.begin(), particles.end(),
                 [this, &tree](Particle& p) {
-                  findForce(tree.getRoot(), p, theta, G, eps);
+                  findForce(tree.getRoot(), p, theta, G, eps, includeQuadrupole);
                   p.acceleration += externalField(p.position);
                 });
 }
@@ -272,6 +342,9 @@ void BarnesHut::calculateAccelerations(const Tree& tree) {
 void BarnesHut::doStep() {
   clearAccelerations();
   Tree tree(particles, low, H);
+  if (includeQuadrupole) {
+    calcQ(tree.root);
+  }
   calculateAccelerations(tree);
   PE = calculatePE(tree);
 }
@@ -296,13 +369,62 @@ float BarnesHut::calculatePE(const Tree& tree) {
   const auto nRange = std::views::iota(0, N);
   std::fill(std::execution::par, PEContributions.begin(), PEContributions.end(), 0.0f);
   std::for_each(std::execution::par, nRange.begin(), nRange.end(), [this, &tree](int i) {
-    findPE(tree.getRoot(), i, particles, theta, G, eps, PEContributions);
+    findPE(tree.getRoot(), i, particles, theta, G, eps, PEContributions, includeQuadrupole);
     Particle& p = particles[i];
     PEContributions[i] /= 2;
     PEContributions[i] += p.mass * externalPotential(p.position);
   });
 
   return std::reduce(std::execution::par, PEContributions.begin(), PEContributions.end());
+}
+
+Mat3x3 Mat3x3::zero() {
+  return Mat3x3{std::array<float, 9>{0, 0, 0, 0, 0, 0, 0, 0, 0}};
+}
+
+Mat3x3 Mat3x3::I() {
+  return Mat3x3{std::array<float, 9>{1, 0, 0, 0, 1, 0, 0, 0, 1}};
+}
+
+float& Mat3x3::operator()(int row, int col) {
+  return data[row * 3 + col];
+}
+
+const float& Mat3x3::operator()(int row, int col) const {
+  return data[row * 3 + col];
+}
+
+Mat3x3 Mat3x3::operator+(const Mat3x3& other) const {
+  Mat3x3 result;
+  for (int i = 0; i < 9; ++i)
+    result.data[i] = data[i] + other.data[i];
+  return result;
+}
+
+Mat3x3 Mat3x3::operator-(const Mat3x3& other) const {
+  Mat3x3 result;
+  for (int i = 0; i < 9; ++i)
+    result.data[i] = data[i] - other.data[i];
+  return result;
+}
+
+Mat3x3& Mat3x3::operator+=(const Mat3x3& other) {
+  for (int i = 0; i < 9; ++i)
+    data[i] += other.data[i];
+  return *this;
+}
+
+Mat3x3 Mat3x3::operator*(float scalar) const {
+  Mat3x3 result;
+  for (int i = 0; i < 9; ++i)
+    result.data[i] = data[i] * scalar;
+  return result;
+}
+
+Mat3x3& Mat3x3::operator*=(float scalar) {
+  for (int i = 0; i < 9; ++i)
+    data[i] *= scalar;
+  return *this;
 }
 
 }  // namespace BH

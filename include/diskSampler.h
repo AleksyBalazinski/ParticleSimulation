@@ -5,7 +5,7 @@
 
 class DiskSampler {
  public:
-  DiskSampler();
+  DiskSampler(unsigned int seed);
 
   std::vector<Vec3>
   sample(Vec3 center, float rb, float mb, float rd, float md, float thickness, float G, int n);
