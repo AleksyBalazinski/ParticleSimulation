@@ -4,9 +4,32 @@
 #include <functional>
 #include <vector>
 #include "particle.h"
+#include "stateRecorder.h"
 #include "vec3.h"
 
 namespace BH {
+
+struct Mat3x3 {
+  static Mat3x3 zero();
+
+  static Mat3x3 I();
+
+  float& operator()(int row, int col);
+
+  const float& operator()(int row, int col) const;
+
+  Mat3x3 operator+(const Mat3x3& other) const;
+
+  Mat3x3 operator-(const Mat3x3& other) const;
+
+  Mat3x3& operator+=(const Mat3x3& other);
+
+  Mat3x3 operator*(float scalar) const;
+
+  Mat3x3& operator*=(float scalar);
+
+  std::array<float, 9> data;
+};
 
 struct Node {
   Node(Vec3 low, float H, Particle* p = nullptr);
@@ -18,7 +41,12 @@ struct Node {
   std::array<Node*, 8> children;
   const Particle* p;
   int id;  // TODO remove
+  Mat3x3 Q;
 };
+
+Vec3 operator*(const Mat3x3& m, const Vec3& v);
+Mat3x3 outerProd(const Vec3& u, const Vec3& v);
+float dotProd(const Vec3& u, const Vec3& v);
 
 void insert(Node* root, const Particle& p);
 void createChildren(std::array<Node*, 8>& children, Vec3 parentLow, float parentH);
@@ -27,7 +55,13 @@ void updateInternalNode(Node* node, const Particle& p);
 void DFSFree(Node* root);
 void DFSPrint(Node* root);
 
-void findForce(const Node* root, Particle& p, float theta, float G, float eps);
+void calcQ(Node* node);
+void findForce(const Node* root,
+               Particle& p,
+               float theta,
+               float G,
+               float eps,
+               bool includeQuadrupole);
 Vec3 gravity(Vec3 r1, float m1, Vec3 r2, float G, float eps);
 float dist(Vec3 a, Vec3 b);
 
@@ -43,7 +77,6 @@ class Tree {
   void print();
   const Node* getRoot() const;
 
- private:
   Node* root;
 };
 
@@ -57,10 +90,15 @@ class BarnesHut {
             float H,
             float G,
             float softeningLength,
-            float theta);
+            float theta,
+            bool includeQuadrupole = false);
   ~BarnesHut();
 
-  void run(int simLength, float dt);
+  void run(StateRecorder& stateRecorder,
+           const int simLength,
+           float dt,
+           bool collectDiagnostics = false,
+           bool recordField = false);
 
  private:
   void clearAccelerations();
@@ -85,6 +123,7 @@ class BarnesHut {
   float G;
   float eps;
   float theta;
+  bool includeQuadrupole;
 };
 
 }  // namespace BH

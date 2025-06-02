@@ -19,6 +19,7 @@
 	demos.cpp
 	FFTWAdapter.cpp
 	barnesHut.cpp
+	plummerSampler.cpp
 )
 
 if(USE_CUDA)
@@ -89,6 +90,9 @@ target_sources(ParticleSimulationLib
 	stateRecorder.cpp
 	ppMethod.cpp
 	barnesHut.cpp
+	particle.cpp
+	simInfo.cpp
+	grid.cpp
 )
 
 target_include_directories(ParticleSimulationLib

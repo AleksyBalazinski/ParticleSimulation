@@ -22,24 +22,22 @@ class P3MMethod {
       float H,
       float softeningLength,
       CloudShape cloudShape,
-      bool useSRForceTable = true);
+      bool useSRForceTable = true,
+      bool enableYSorting = true);
 
-  void run(const int simLength,
+  void run(StateRecorder& stateRecorder,
+           const int simLength,
            bool collectDiagnostics = false,
-           const char* positionsPath = "output.dat",
-           const char* energyPath = "energy.txt",
-           const char* momentumPath = "momentum.txt",
-           const char* expectedMomentumPath = "expected_momentum.txt",
-           const char* angularMomentumPath = "angular_momentum.txt");
+           bool recordField = false);
 
  private:
   void calculateShortRangeForces(std::vector<Particle>& particles);
 
-  float referenceForceS1(float r, float a);
-  float referenceForceS2(float r, float a);
+  float referenceForceS1(float r);
+  float referenceForceS2(float r);
 
-  Vec3 shortRangeForce(Vec3 rij, float mi, float mj, float a);
-  Vec3 shortRangeForceFromTable(Vec3 rij, float mi, float mj, float a);
+  Vec3 shortRangeForce(Vec3 rij, float mi, float mj);
+  Vec3 shortRangeForceFromTable(Vec3 rij, float mi, float mj);
 
   void updateSRForces(int i, int j, int q, int qn, int qnLocal, std::vector<Particle>& particles);
   void initSRForceTable();
@@ -60,6 +58,7 @@ class P3MMethod {
   std::vector<float> FTable;
   const float softeningLength;
   bool useSRForceTable;
+  bool enableYSorting;
   const CloudShape cloudShape;
   std::vector<float> threadTimes;
 };

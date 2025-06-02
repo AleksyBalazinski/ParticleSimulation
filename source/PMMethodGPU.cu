@@ -88,8 +88,8 @@ std::string PMMethodGPU::run(const int simLength,
   createCudaEvents(findFieldInCells);
   createCudaEvents(updateAccelerations);
 
-  StateRecorder stateRecorder(positionsPath, N, simLength + 1, energyPath, momentumPath,
-                              expectedMomentumPath, angularMomentumPath, fieldPath);
+  StateRecorder stateRecorder(positionsPath, N, 1, energyPath, momentumPath, expectedMomentumPath,
+                              angularMomentumPath, fieldPath);
   SimInfo simInfo;
 
   if (collectDiagnostics) {
@@ -120,9 +120,11 @@ std::string PMMethodGPU::run(const int simLength,
     stateToOriginalUnits<<<numBlocks(N), BLOCK_SIZE>>>(d_particles, N, H, DT);
 
     if (!collectDiagnostics) {
-      measureHostTime(memcpy, cudaMemcpy(particles.data(), d_particles, N * sizeof(Particle),
-                                         cudaMemcpyDeviceToHost));
-      measureHostTime(recordPositions, stateRecorder.recordPositions(particles));
+      if (t == simLength) {
+        measureHostTime(memcpy, cudaMemcpy(particles.data(), d_particles, N * sizeof(Particle),
+                                           cudaMemcpyDeviceToHost));
+        measureHostTime(recordPositions, stateRecorder.recordPositions(particles));
+      }
     } else {
       massesToOriginalUnits<<<numBlocks(N), BLOCK_SIZE>>>(d_particles, N, H, DT, G);
       measureHostTime(memcpy, cudaMemcpy(particles.data(), d_particles, N * sizeof(Particle),

@@ -4,7 +4,6 @@
 #include "RK4Stepper.h"
 #include "leapfrog.h"
 #include "simInfo.h"
-#include "stateRecorder.h"
 
 Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<float>& masses, float G) {
   const int n = (int)masses.size();
@@ -21,7 +20,7 @@ Vec3 acceleration(int i, const std::vector<Vec3>& r, const std::vector<float>& m
   return acc;
 }
 
-void updateAccelerations(std::vector<Particle>& particles, float G) {
+void updateAccelerations(std::vector<Particle>& particles, float G, float eps) {
   for (auto& p : particles) {
     p.acceleration = Vec3(0, 0, 0);
   }
@@ -29,7 +28,6 @@ void updateAccelerations(std::vector<Particle>& particles, float G) {
   for (int i = 0; i < particles.size(); ++i) {
     for (int j = i + 1; j < particles.size(); ++j) {
       Vec3 rij = particles[i].position - particles[j].position;
-      float eps = 0;
       float denom = std::powf(rij.getMagnitudeSquared() + eps * eps, 1.5f);
       particles[i].acceleration += -1 * G * particles[j].mass / denom * rij;
       particles[j].acceleration += G * particles[i].mass / denom * rij;
@@ -63,12 +61,8 @@ std::string ppMethodRK4(std::vector<Vec3>& state,
                         const int simLength,
                         const float stepSize,
                         const float G,
-                        const char* positionsPath,
-                        const char* energyPath,
-                        const char* momentumPath) {
+                        StateRecorder& stateRecorder) {
   const int n = (int)masses.size();
-  StateRecorder stateRecorder(positionsPath, n, simLength + 1, energyPath, momentumPath, "", "",
-                              "");
 
   auto system = [&masses, G](StateType& x, StateType& dxdt, float t) {
     nBody(x, dxdt, t, masses, G);
@@ -96,24 +90,26 @@ std::string ppMethodLeapfrog(const std::vector<Vec3>& state,
                              const int simLength,
                              const float stepSize,
                              const float G,
-                             const char* positionsPath,
-                             const char* energyPath,
-                             const char* momentumPath,
-                             const char* angularMomentumPath) {
+                             const float softeningLength,
+                             StateRecorder& stateRecorder,
+                             bool recordField) {
   const int N = int(masses.size());
-  StateRecorder stateRecorder(positionsPath, N, simLength + 1, energyPath, momentumPath, "",
-                              angularMomentumPath, "");
+
   std::vector<Particle> particles;
   for (int i = 0; i < N; ++i) {
     particles.emplace_back(state[i], state[N + i], masses[i]);
   }
 
-  updateAccelerations(particles, G);
+  updateAccelerations(particles, G, softeningLength);
   setHalfStepVelocities(particles, stepSize);
 
   for (int t = 0; t <= simLength; ++t) {
     std::cout << "progress: " << float(t) / simLength << '\r';
     std::cout.flush();
+
+    if (recordField) {
+      stateRecorder.recordField(particles, 1, 1);
+    }
 
     updatePositions(particles, stepSize);
     stateRecorder.recordPositions(particles);
@@ -121,7 +117,7 @@ std::string ppMethodLeapfrog(const std::vector<Vec3>& state,
     setIntegerStepVelocities(particles);
     stateRecorder.recordTotalMomentum(SimInfo::totalMomentum(particles));
 
-    updateAccelerations(particles, G);
+    updateAccelerations(particles, G, softeningLength);
     updateVelocities(particles, stepSize);
   }
 

@@ -9,17 +9,17 @@ print(f"x: ({pos_min[0]}, {pos_max[0]}), y: ({pos_min[1]}, {pos_max[1]}), z: ({p
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 
-ax.set_xlim([pos_min[0], pos_max[0]])
-ax.set_ylim([pos_min[1], pos_max[1]])
-ax.set_zlim([pos_min[2], pos_max[2]])
+ax.set_xlim(0, 60)
+ax.set_ylim(0, 60)
+ax.set_zlim(0, 60)
 
 scat = ax.scatter([], [], [], s=1)
 
 def update(frame):
     ax.clear()
-    ax.set_xlim([pos_min[0], pos_max[0]])
-    ax.set_ylim([pos_min[1], pos_max[1]])
-    ax.set_zlim([pos_min[2], pos_max[2]])
+    ax.set_xlim(0, 60)
+    ax.set_ylim(0, 60)
+    ax.set_zlim(0, 60)
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')

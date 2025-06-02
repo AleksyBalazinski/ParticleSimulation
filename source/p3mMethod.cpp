@@ -28,13 +28,15 @@ P3MMethod::P3MMethod(
     float H,
     float softeningLength,
     CloudShape cloudShape,
-    bool useSRForceTable)
+    bool useSRForceTable,
+    bool enableYSorting)
     : pmMethod(pmMethod),
       chainingMesh(compBoxSize, cutoffRadius, H, int(pmMethod.getParticles().size())),
       cutoffRadius(lengthToCodeUnits(cutoffRadius, pmMethod.getH())),
       particleDiameter(lengthToCodeUnits(particleDiameter, H)),
       softeningLength(lengthToCodeUnits(softeningLength, H)),
       useSRForceTable(useSRForceTable),
+      enableYSorting(enableYSorting),
       cloudShape(cloudShape),
       threadTimes(std::thread::hardware_concurrency(), 0.0f) {
   this->tabulatedValuesCnt = 500;
@@ -54,17 +56,12 @@ void correctAccelerations(std::vector<Particle>& particles) {
   });
 }
 
-void P3MMethod::run(const int simLength,
+void P3MMethod::run(StateRecorder& stateRecorder,
+                    const int simLength,
                     bool collectDiagnostics,
-                    const char* positionsPath,
-                    const char* energyPath,
-                    const char* momentumPath,
-                    const char* expectedMomentumPath,
-                    const char* angularMomentumPath) {
+                    bool recordField) {
   std::vector<Particle>& particles = pmMethod.getParticles();
-  StateRecorder stateRecorder(positionsPath, int(pmMethod.getParticles().size()), simLength + 1,
-                              energyPath, momentumPath, expectedMomentumPath, angularMomentumPath,
-                              "");
+
   float H = pmMethod.getH();
   float DT = pmMethod.getDT();
   float G = pmMethod.getG();
@@ -84,14 +81,22 @@ void P3MMethod::run(const int simLength,
 #ifdef CUDA
   pmMethod.copyParticlesDeviceToHost();
 #endif
+  // auto start = std::chrono::high_resolution_clock::now();
   measureTime(shortRangeForcesCalc, calculateShortRangeForces(particles));
   measureTime(correctAccelerations, correctAccelerations(particles));
+  // auto end = std::chrono::high_resolution_clock::now();
+  // auto elapsed = duration_cast<std::chrono::milliseconds>(end - start);
+  // std::cout << particleDiameter << ", " << elapsed.count() << std::endl;
 
   setHalfStepVelocities(particles);
 
   for (int t = 0; t <= simLength; ++t) {
     std::cout << "progress: " << float(t) / simLength << '\r';
     std::cout.flush();
+
+    if (recordField) {
+      stateRecorder.recordField(particles, H, DT);
+    }
 
     updatePositions(particles);
 
@@ -148,14 +153,14 @@ void P3MMethod::run(const int simLength,
     updateVelocities(particles);
   }
 
-  printTime(chainingMeshSetup);
-  printTime(shortRangeForcesCalc);
-  printTime(pmStep);
-  printTime(correctAccelerations);
+  // printTime(chainingMeshSetup);
+  // printTime(shortRangeForcesCalc);
+  // printTime(pmStep);
+  // printTime(correctAccelerations);
 
-  for (int i = 0; i < 12; ++i) {
-    std::cout << "thread " << i << " was working for " << threadTimes[i] << " ms\n";
-  }
+  // for (int i = 0; i < 12; ++i) {
+  //   std::cout << "thread " << i << " was working for " << threadTimes[i] << " ms\n";
+  // }
 
   stateRecorder.flush();
 }
@@ -169,7 +174,11 @@ void P3MMethod::calculateShortRangeForces(std::vector<Particle>& particles) {
     }
   });
 
-  measureTime(chainingMeshSetup, chainingMesh.fillWithYSorting(particles));
+  if (enableYSorting) {
+    measureTime(chainingMeshSetup, chainingMesh.fillWithYSorting(particles));
+  } else {
+    measureTime(chainingMeshSetup, chainingMesh.fill(particles));
+  }
 
   std::vector<std::thread> smallCellThreads;
   for (int tid = 0; tid < maxThreads; ++tid) {
@@ -182,15 +191,17 @@ void P3MMethod::calculateShortRangeForces(std::vector<Particle>& particles) {
   }
 }
 
-float P3MMethod::referenceForceS1(float r, float a) {
-  float G = 1 / (4 * std::numbers::pi_v<float>);
+float P3MMethod::referenceForceS1(float r) {
+  const float a = particleDiameter;
+  const float G = 1 / (4 * std::numbers::pi_v<float>);
   if (r >= a) {
     return G / (r * r);
   }
   return G / (a * a) * (8 * r / a - 9 * r * r / (a * a) + 2 * std::powf(r / a, 4));
 }
 
-float P3MMethod::referenceForceS2(float r, float a) {
+float P3MMethod::referenceForceS2(float r) {
+  const float a = particleDiameter;
   const float G = 1 / (4 * std::numbers::pi_v<float>);
   const float u = 2 * r / a;
   if (u <= 1) {
@@ -206,16 +217,16 @@ float P3MMethod::referenceForceS2(float r, float a) {
   return G / (r * r);
 }
 
-Vec3 P3MMethod::shortRangeForce(Vec3 rij, float mi, float mj, float a) {
+Vec3 P3MMethod::shortRangeForce(Vec3 rij, float mi, float mj) {
   float rijLength = rij.getMagnitude();
   Vec3 rijDir = rij / rijLength;
   float G = 1 / (4 * std::numbers::pi_v<float>);
 
   float R;
   if (cloudShape == CloudShape::S1) {
-    R = referenceForceS1(rijLength, particleDiameter);
+    R = referenceForceS1(rijLength);
   } else if (cloudShape == CloudShape::S2) {
-    R = referenceForceS2(rijLength, particleDiameter);
+    R = referenceForceS2(rijLength);
   } else {
     throw std::invalid_argument("not implemnted");
   }
@@ -226,7 +237,7 @@ Vec3 P3MMethod::shortRangeForce(Vec3 rij, float mi, float mj, float a) {
   return totalForceij - Rij;
 }
 
-Vec3 P3MMethod::shortRangeForceFromTable(Vec3 rij, float mi, float mj, float a) {
+Vec3 P3MMethod::shortRangeForceFromTable(Vec3 rij, float mi, float mj) {
   float ksi = rij.getMagnitudeSquared() / deltaSquared;
   int t = int(ksi);
   float F = mi * mj * (FTable[t] + (ksi - t) * (FTable[t + 1] - FTable[t]));
@@ -250,10 +261,9 @@ void P3MMethod::updateSRForces(int i,
 
   Vec3 shortRangeij;
   if (!useSRForceTable) {
-    shortRangeij = shortRangeForce(rij, particles[i].mass, particles[j].mass, particleDiameter);
+    shortRangeij = shortRangeForce(rij, particles[i].mass, particles[j].mass);
   } else {
-    shortRangeij =
-        shortRangeForceFromTable(rij, particles[i].mass, particles[j].mass, particleDiameter);
+    shortRangeij = shortRangeForceFromTable(rij, particles[i].mass, particles[j].mass);
   }
 
   particles[i].shortRangeForce += shortRangeij;
@@ -268,9 +278,9 @@ void P3MMethod::initSRForceTable() {
     float r = std::sqrtf(rSquared);
     float R;
     if (cloudShape == CloudShape::S1) {
-      R = -referenceForceS1(r, particleDiameter);
+      R = -referenceForceS1(r);
     } else if (cloudShape == CloudShape::S2) {
-      R = -referenceForceS2(r, particleDiameter);
+      R = -referenceForceS2(r);
     } else {
       throw std::invalid_argument("not implemented");
     }
@@ -296,8 +306,9 @@ void P3MMethod::updateSRForcesThreadJob(int tid, int threadsCnt, std::vector<Par
       for (auto node = chainingMesh.getParticlesInCell(q); node != nullptr; node = node->next) {
         for (auto nodeN = chainingMesh.getParticlesInCell(qn); nodeN != nullptr;
              nodeN = nodeN->next) {
-          if (particles[nodeN->particleId].position.y - particles[node->particleId].position.y >
-              cutoffRadius) {
+          if (enableYSorting &&
+              particles[nodeN->particleId].position.y - particles[node->particleId].position.y >
+                  cutoffRadius) {
             break;
           }
           updateSRForces(node->particleId, nodeN->particleId, q, qn, i, particles);

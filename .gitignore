@@ -366,3 +366,4 @@ animations/
 build/
 .vscode/
 temp.txt
+output/

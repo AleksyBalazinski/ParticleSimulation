@@ -18,6 +18,7 @@ class ChainingMesh {
   ChainingMesh(std::tuple<float, float, float> compBoxSize, float cutoffRadius, float H, int N);
 
   void fillWithYSorting(const std::vector<Particle>& particles);
+  void fill(const std::vector<Particle>& particles);
 
   std::array<int, 14> getNeighborsAndSelf(int cellIdx) const;
 

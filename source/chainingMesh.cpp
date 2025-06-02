@@ -42,6 +42,21 @@ void ChainingMesh::fillWithYSorting(const std::vector<Particle>& particles) {
   }
 }
 
+void ChainingMesh::fill(const std::vector<Particle>& particles) {
+  std::memset(hoc.data(), 0, size * sizeof(LLNode*));
+
+  for (int i = 0; i < particles.size(); ++i) {
+    const auto& p = particles[i];
+    int cellX = int(p.position.x / HCx);
+    int cellY = int(p.position.y / HCy);
+    int cellZ = int(p.position.z / HCz);
+
+    int cellIdx = tripleToFlatIndex(cellX, cellY, cellZ);
+    LLNode* head = hoc[cellIdx];
+    hoc[cellIdx] = new (nodePool.get() + i) LLNode(i, head);
+  }
+}
+
 std::array<int, 14> ChainingMesh::getNeighborsAndSelf(int cellIdx) const {
   auto [cellX, cellY, cellZ] = flatToTripleIndex(cellIdx);
   std::array<int, 14> neighbors;

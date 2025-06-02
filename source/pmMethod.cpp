@@ -1,6 +1,7 @@
 #include "pmMethod.h"
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <complex>
 #include <execution>
@@ -58,17 +59,10 @@ PMMethod::PMMethod(const std::vector<Vec3>& state,
   }
 }
 
-std::string PMMethod::run(const int simLength,
+std::string PMMethod::run(StateRecorder& stateRecorder,
+                          const int simLength,
                           bool collectDiagnostics,
-                          bool recordField,
-                          const char* positionsPath,
-                          const char* energyPath,
-                          const char* momentumPath,
-                          const char* expectedMomentumPath,
-                          const char* angularMomentumPath,
-                          const char* fieldPath) {
-  StateRecorder stateRecorder(positionsPath, N, simLength + 1, energyPath, momentumPath,
-                              expectedMomentumPath, angularMomentumPath, fieldPath);
+                          bool recordField) {
   SimInfo simInfo;
 
   if (collectDiagnostics) {
@@ -85,6 +79,10 @@ std::string PMMethod::run(const int simLength,
   for (int t = 0; t <= simLength; ++t) {
     std::cout << "progress: " << float(t) / simLength << '\r';
     std::cout.flush();
+
+    if (recordField) {
+      stateRecorder.recordField(particles, H, DT);
+    }
 
     updatePositions(particles);
 
@@ -106,9 +104,7 @@ std::string PMMethod::run(const int simLength,
       auto ke = SimInfo::kineticEnergy(particles);
       stateRecorder.recordEnergy(pe, ke);
     }
-    if (recordField) {
-      stateRecorder.recordField(particles, H, DT);
-    }
+
     if (escapedComputationalBox()) {
       std::cout << "Particle moved outside the computational box.\n";
       break;
@@ -160,11 +156,9 @@ bool PMMethod::escapedComputationalBox() {
 }
 
 Vec3 PMMethod::totalExternalForceOrigUnits() {
-  Vec3 f;
-  std::for_each(std::execution::seq, particles.begin(), particles.end(),
-                [this, &f](const Particle& p) { f += p.mass * externalField(p.position); });
-
-  return f;
+  return std::transform_reduce(
+      std::execution::par, particles.begin(), particles.end(), Vec3::zero(), std::plus<>(),
+      [this](const Particle& p) { return p.mass * externalField(p.position); });
 }
 
 void PMMethod::initGreensFunction() {
@@ -176,18 +170,12 @@ void PMMethod::initGreensFunction() {
     std::complex<float> G;
     if (gFunc == GreensFunction::DISCRETE_LAPLACIAN) {
       G = GreenDiscreteLaplacian(kx, ky, kz, dims);
+    } else if (gFunc == GreensFunction::POOR_MAN) {
+      G = GreenPoorMan(kx, ky, kz, dims);
     } else if (gFunc == GreensFunction::S1_OPTIMAL) {
-      if (is == InterpolationScheme::TSC) {
-        G = GreenOptimalTSC(kx, ky, kz, dims, particleDiameter, CloudShape::S1, fds);
-      } else {
-        throw std::invalid_argument("not implemented");
-      }
+      G = GreenOptimal(is, kx, ky, kz, dims, particleDiameter, CloudShape::S1, fds);
     } else if (gFunc == GreensFunction::S2_OPTIMAL) {
-      if (is == InterpolationScheme::TSC) {
-        G = GreenOptimalTSC(kx, ky, kz, dims, particleDiameter, CloudShape::S2, fds);
-      } else {
-        throw std::invalid_argument("not implemented");
-      }
+      G = GreenOptimal(is, kx, ky, kz, dims, particleDiameter, CloudShape::S2, fds);
     } else {
       throw std::invalid_argument("not implemented");
     }
@@ -198,13 +186,13 @@ void PMMethod::initGreensFunction() {
 
 float PMMethod::TSCAssignmentFunc(float x, int t) {
   if (t == 1) {
-    return 0.5f * (0.5f + x) * (0.5f + x);
+    return (0.5f + x) * (0.5f + x);
   }
   if (t == 0) {
-    return 0.75f - x * x;
+    return 1.5f - 2 * x * x;
   }
   if (t == -1) {
-    return 0.5f * (0.5f - x) * (0.5f - x);
+    return (0.5f - x) * (0.5f - x);
   }
   return 0;
 }
@@ -270,11 +258,11 @@ void PMMethod::spreadMass() {
                       float dz = p.position.z - z;
 
                       for (int t1 = -1; t1 <= 1; ++t1) {
-                        float T1 = (d / 8) * 2 * TSCAssignmentFunc(dx, t1);
+                        float T1 = (d / 8) * TSCAssignmentFunc(dx, t1);
                         for (int t2 = -1; t2 <= 1; ++t2) {
-                          float T2 = T1 * 2 * TSCAssignmentFunc(dy, t2);
+                          float T2 = T1 * TSCAssignmentFunc(dy, t2);
                           for (int t3 = -1; t3 <= 1; ++t3) {
-                            float T3 = T2 * 2 * TSCAssignmentFunc(dz, t3);
+                            float T3 = T2 * TSCAssignmentFunc(dz, t3);
                             grid.assignDensity(x + t1, y + t2, z + t3, T3);
                           }
                         }
@@ -331,11 +319,11 @@ Vec3 PMMethod::interpolateField(Vec3 position) {
 
       Vec3 interpolatedField;
       for (int t1 = -1; t1 <= 1; ++t1) {
-        float T1 = 2 * TSCAssignmentFunc(dx, t1);
+        float T1 = TSCAssignmentFunc(dx, t1);
         for (int t2 = -1; t2 <= 1; ++t2) {
-          float T2 = T1 * 2 * TSCAssignmentFunc(dy, t2);
+          float T2 = T1 * TSCAssignmentFunc(dy, t2);
           for (int t3 = -1; t3 <= 1; ++t3) {
-            float T3 = T2 * 2 * TSCAssignmentFunc(dz, t3);
+            float T3 = T2 * TSCAssignmentFunc(dz, t3);
             interpolatedField += 0.125f * T3 * grid.getField(xi + t1, yi + t2, zi + t3);
           }
         }
