@@ -41,8 +41,10 @@ void handleOptions(int argc, char* argv[]) {
       {"pm-optimal", [&]() { pmOptimal(arg2); }},
       {"pm-optimal-var-diameter", [&]() { pmOptimalVaryingDiameter(arg2); }},
       {"pm-optimal-assignments", [&]() { pmOptimalAssignments(arg2); }},
+#ifndef CUDA
       {"p3m-accuracy-assignments", [&]() { p3mAccuracyAssignments(arg2); }},
       {"p3m-accuracy-shapes", [&]() { p3mAccuracyShapes(arg2); }},
+#endif
       {"bh-accuracy", [&]() { bhAccuracy(arg2); }},
       {"galaxy-sim-pm", [&]() { galaxySimulationPM(arg2); }},
       {"galaxy-sim-p3m", [&]() { galaxySimulationP3M(arg2); }},

@@ -22,9 +22,10 @@ void pmOptimalVaryingDiameter(const char* outputDir);
 
 void pmOptimalAssignments(const char* outputDir);
 
+#ifndef CUDA
 void p3mAccuracyAssignments(const char* outputDir);
-
 void p3mAccuracyShapes(const char* outputDir);
+#endif
 
 void bhAccuracy(const char* outputDir);
 
