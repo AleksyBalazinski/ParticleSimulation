@@ -72,15 +72,10 @@ PMMethodGPU::~PMMethodGPU() {
   grid.freeGrid();
 }
 
-std::string PMMethodGPU::run(const int simLength,
+std::string PMMethodGPU::run(StateRecorder& stateRecorder,
+                             const int simLength,
                              bool collectDiagnostics,
-                             bool recordField,
-                             const char* positionsPath,
-                             const char* energyPath,
-                             const char* momentumPath,
-                             const char* expectedMomentumPath,
-                             const char* angularMomentumPath,
-                             const char* fieldPath) {
+                             bool recordField) {
   createCudaEvents(spreadMass);
   createCudaEvents(fftDensity);
   createCudaEvents(findFourierPotential);
@@ -88,8 +83,6 @@ std::string PMMethodGPU::run(const int simLength,
   createCudaEvents(findFieldInCells);
   createCudaEvents(updateAccelerations);
 
-  StateRecorder stateRecorder(positionsPath, N, 1, energyPath, momentumPath, expectedMomentumPath,
-                              angularMomentumPath, fieldPath);
   SimInfo simInfo;
 
   if (collectDiagnostics) {
@@ -228,18 +221,12 @@ void PMMethodGPU::initGreensFunction() {
     std::complex<float> G;
     if (gFunc == GreensFunction::DISCRETE_LAPLACIAN) {
       G = GreenDiscreteLaplacian(kx, ky, kz, dims);
+    } else if (gFunc == GreensFunction::POOR_MAN) {
+      G = GreenPoorMan(kx, ky, kz, dims);
     } else if (gFunc == GreensFunction::S1_OPTIMAL) {
-      if (is == InterpolationScheme::TSC) {
-        G = GreenOptimalTSC(kx, ky, kz, dims, particleDiameter, CloudShape::S1, fds);
-      } else {
-        throw std::invalid_argument("not implemented");
-      }
+      G = GreenOptimal(is, kx, ky, kz, dims, particleDiameter, CloudShape::S1, fds);
     } else if (gFunc == GreensFunction::S2_OPTIMAL) {
-      if (is == InterpolationScheme::TSC) {
-        G = GreenOptimalTSC(kx, ky, kz, dims, particleDiameter, CloudShape::S2, fds);
-      } else {
-        throw std::invalid_argument("not implemented");
-      }
+      G = GreenOptimal(is, kx, ky, kz, dims, particleDiameter, CloudShape::S2, fds);
     } else {
       throw std::invalid_argument("not implemented");
     }

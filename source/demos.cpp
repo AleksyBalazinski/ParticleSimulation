@@ -589,6 +589,7 @@ void pmOptimalAssignments(const char* outputDir) {
   }
 }
 
+#ifndef CUDA
 void p3mAccuracyAssignments(const char* outputDir) {
   Vec3 galaxyCenter = Vec3(30, 30, 15);
   float rb = 3.0f;
@@ -654,7 +655,9 @@ void p3mAccuracyAssignments(const char* outputDir) {
     }
   }
 }
+#endif
 
+#ifndef CUDA
 void p3mAccuracyShapes(const char* outputDir) {
   Vec3 galaxyCenter = Vec3(30, 30, 15);
   float rb = 3.0f;
@@ -721,6 +724,7 @@ void p3mAccuracyShapes(const char* outputDir) {
     }
   }
 }
+#endif
 
 void galaxySimulationPM(const char* outputDir) {
   /*

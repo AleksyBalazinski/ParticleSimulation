@@ -26,15 +26,10 @@ class PMMethodGPU {
               std::tuple<int, int, int> gridPoints);
   ~PMMethodGPU();
 
-  std::string run(const int simLength,
+  std::string run(StateRecorder& stateRecorder,
+                  const int simLength,
                   bool collectDiagnostics = false,
-                  bool recordField = false,
-                  const char* positionsPath = "output.dat",
-                  const char* energyPath = "energy.txt",
-                  const char* momentumPath = "momentum.txt",
-                  const char* expectedMomentumPath = "expected_momentum.txt",
-                  const char* angularMomentumPath = "angular_momentum.txt",
-                  const char* fieldPath = "field.dat");
+                  bool recordField = false);
 
   std::vector<Particle>& getParticles() { return particles; };
   float getH() const { return H; }
