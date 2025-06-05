@@ -32,13 +32,14 @@ struct Mat3x3 {
 };
 
 struct Node {
-  Node(Vec3 low, float H, Particle* p = nullptr);
+  Node(Vec3 low, float H, Node* parent, Particle* p = nullptr);
   ~Node();
   Vec3 COM;
   float M;
   Vec3 low;
   float H;
   std::array<Node*, 8> children;
+  Node* parent;
   const Particle* p;
   int id;  // TODO remove
   Mat3x3 Q;
@@ -48,14 +49,13 @@ Vec3 operator*(const Mat3x3& m, const Vec3& v);
 Mat3x3 outerProd(const Vec3& u, const Vec3& v);
 float dotProd(const Vec3& u, const Vec3& v);
 
-void insert(Node* root, const Particle& p);
-void createChildren(std::array<Node*, 8>& children, Vec3 parentLow, float parentH);
+void createChildren(Node* parent);
 int getChildId(Node* root, const Particle& p);
-void updateInternalNode(Node* node, const Particle& p);
 void DFSFree(Node* root);
 void DFSPrint(Node* root);
 
 void calcQ(Node* node);
+void calcCOM(Node* node);
 void findForce(const Node* root,
                Particle& p,
                float theta,
@@ -72,12 +72,18 @@ void updatePositions(std::vector<Particle>& particles, float dt = 1.0f);
 
 class Tree {
  public:
-  Tree(const std::vector<Particle>& particles, Vec3 low, float H);
+  Tree(const std::vector<Particle>& particles, Vec3 low, float H, bool useZOrdering);
   ~Tree();
   void print();
   const Node* getRoot() const;
+  void initZCodes(const std::vector<Particle>& particles);
+  void insert(Node* root, const Particle& p);
 
+  Vec3 compBoxLow;
+  float compBoxSize;
+  std::vector<uint32_t> zCodes;
   Node* root;
+  Node* lastInserted;
 };
 
 class BarnesHut {
@@ -91,7 +97,8 @@ class BarnesHut {
             float G,
             float softeningLength,
             float theta,
-            bool includeQuadrupole = false);
+            bool includeQuadrupole = false,
+            bool useZOrdering = false);
   ~BarnesHut();
 
   void run(StateRecorder& stateRecorder,
@@ -99,6 +106,8 @@ class BarnesHut {
            float dt,
            bool collectDiagnostics = false,
            bool recordField = false);
+
+  double getTreeConstructionSecs();
 
  private:
   void clearAccelerations();
@@ -124,6 +133,8 @@ class BarnesHut {
   float eps;
   float theta;
   bool includeQuadrupole;
+  bool useZOrdering;
+  double treeConstructionSeconds{};
 };
 
 }  // namespace BH
