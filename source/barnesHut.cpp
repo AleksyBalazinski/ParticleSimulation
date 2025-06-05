@@ -1,8 +1,11 @@
 #include "barnesHut.h"
 #include <algorithm>
+#include <bitset>
+#include <chrono>
 #include <cmath>
 #include <execution>
 #include <iostream>
+#include <numeric>
 #include <ranges>
 #include "simInfo.h"
 #include "stateRecorder.h"
@@ -11,18 +14,46 @@ namespace BH {
 
 int nodeID = 0;
 
-Node::Node(Vec3 low, float H, Particle* p)
-    : low(low), H(H), p(p), COM(), M(0.0f), children({nullptr}) {
+Node::Node(Vec3 low, float H, Node* parent, Particle* p)
+    : low(low), H(H), p(p), COM(), M(0.0f), children({nullptr}), parent(parent) {
   id = nodeID++;
 }
 
 Node::~Node() {}
 
-Tree::Tree(const std::vector<Particle>& particles, Vec3 low, float H) {
-  root = new Node(low, H);
+bool nodeContains(const Particle& p, const Node& n) {
+  return p.position.x > n.low.x && p.position.x < n.low.x + n.H && p.position.y > n.low.y &&
+         p.position.y < n.low.y + n.H && p.position.z > n.low.z && p.position.z < n.low.z + n.H;
+}
 
-  for (const auto& p : particles) {
-    insert(root, p);
+Tree::Tree(const std::vector<Particle>& particles, Vec3 low, float H, bool useZOrdering)
+    : compBoxLow(low), compBoxSize(H), zCodes(particles.size()), lastInserted(nullptr) {
+  if (useZOrdering) {
+    initZCodes(particles);
+    std::vector<int> indices(particles.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(std::execution::par, indices.begin(), indices.end(),
+              [this](int i, int j) { return zCodes[i] < zCodes[j]; });
+
+    root = new Node(low, H, nullptr);
+    for (int idx : indices) {  // iterate particles in Z-order
+      const auto& p = particles[idx];
+      if (lastInserted == nullptr) {
+        insert(root, p);
+      } else {
+        auto node = lastInserted;
+        while (!nodeContains(p, *node)) {
+          node = node->parent;
+        }
+        insert(node, p);
+      }
+    }
+  } else {
+    root = new Node(low, H, nullptr);
+
+    for (const auto& p : particles) {
+      insert(root, p);
+    }
   }
 }
 
@@ -37,6 +68,35 @@ void Tree::print() {
 
 const Node* Tree::getRoot() const {
   return root;
+}
+
+uint32_t expandBits3D(uint32_t v) {
+  v &= 0x000003ff;
+  v = (v | (v << 16)) & 0x030000FF;
+  v = (v | (v << 8)) & 0x0300F00F;
+  v = (v | (v << 4)) & 0x030C30C3;
+  v = (v | (v << 2)) & 0x09249249;
+  return v;
+}
+
+uint32_t zCode3D(float x, float y, float z, float compBoxSize, Vec3 compBoxLow) {
+  uint32_t resolution = 1024;
+  x = std::clamp(x - compBoxLow.x, 0.0f, compBoxSize);
+  y = std::clamp(y - compBoxLow.y, 0.0f, compBoxSize);
+  z = std::clamp(z - compBoxLow.z, 0.0f, compBoxSize);
+
+  uint32_t ix = static_cast<uint32_t>((x / compBoxSize) * (resolution - 1));
+  uint32_t iy = static_cast<uint32_t>((y / compBoxSize) * (resolution - 1));
+  uint32_t iz = static_cast<uint32_t>((z / compBoxSize) * (resolution - 1));
+
+  return (expandBits3D(iz) << 2) | (expandBits3D(iy) << 1) | expandBits3D(ix);
+}
+
+void Tree::initZCodes(const std::vector<Particle>& particles) {
+  for (int i = 0; i < particles.size(); ++i) {
+    const auto& pos = particles[i].position;
+    zCodes[i] = zCode3D(pos.x, pos.y, pos.z, compBoxSize, compBoxLow);
+  }
 }
 
 Vec3 operator*(const Mat3x3& m, const Vec3& v) {
@@ -66,34 +126,32 @@ float dotProd(const Vec3& u, const Vec3& v) {
   return u.x * v.x + u.y * v.y + u.z * v.z;
 }
 
-void insert(Node* root, const Particle& p) {
-  if (root->children[0] != nullptr) {  // internal node
-    updateInternalNode(root, p);
-    insert(root->children[getChildId(root, p)], p);
+void Tree::insert(Node* node, const Particle& p) {
+  lastInserted = node;
+  if (node->children[0] != nullptr) {  // internal node
+    insert(node->children[getChildId(node, p)], p);
     return;
   }
   // external node
-  if (root->p == nullptr) {  // free spot
-    root->p = &p;
+  if (node->p == nullptr) {  // free spot
+    node->p = &p;
     return;
   }
   // occupied spot
-  createChildren(root->children, root->low, root->H);
-  updateInternalNode(root, *root->p);
-  updateInternalNode(root, p);
-  insert(root->children[getChildId(root, *root->p)], *root->p);
-  insert(root->children[getChildId(root, p)], p);
-  root->p = nullptr;
+  createChildren(node);
+  insert(node->children[getChildId(node, *node->p)], *node->p);
+  insert(node->children[getChildId(node, p)], p);
+  node->p = nullptr;
 }
 
-void createChildren(std::array<Node*, 8>& children, Vec3 parentLow, float parentH) {
+void createChildren(Node* parent) {
   for (int i = 0; i < 8; ++i) {
-    float H = parentH / 2;
+    float H = parent->H / 2;
     int x = (i >> 2) & 1;
     int y = (i >> 1) & 1;
     int z = i & 1;
-    Vec3 low = parentLow + H * Vec3(float(x), float(y), float(z));
-    children[i] = new Node(low, H);
+    Vec3 low = parent->low + H * Vec3(float(x), float(y), float(z));
+    parent->children[i] = new Node(low, H, parent);
   }
 }
 
@@ -104,12 +162,6 @@ int getChildId(Node* root, const Particle& p) {
   int z = int(offset.z);
   int childId = (x << 2) | (y << 1) | z;
   return childId;
-}
-
-void updateInternalNode(Node* node, const Particle& p) {
-  float totalMass = node->M + p.mass;
-  node->COM = (node->M * node->COM + p.mass * p.position) / totalMass;
-  node->M = totalMass;
 }
 
 void DFSFree(Node* root) {
@@ -160,6 +212,37 @@ void calcQ(Node* node) {
     Q += (outerProd(R, R) * 3 - Mat3x3::I() * R.getMagnitudeSquared()) * childMass;
   }
   node->Q = Q;
+}
+
+void calcCOM(Node* node) {
+  if (node == nullptr)
+    return;
+
+  // external node
+  if (node->children[0] == nullptr) {
+    if (node->p) {
+      node->M = node->p->mass;
+      node->COM = node->p->position;
+    } else {
+      node->M = 0;
+      node->COM = Vec3::zero();
+    }
+    return;
+  }
+
+  // internal node
+  node->M = 0;
+  node->COM = Vec3::zero();
+  for (int i = 0; i < 8; ++i) {
+    calcCOM(node->children[i]);
+    float m = node->children[i]->M;
+    node->COM += m * node->children[i]->COM;
+    node->M += m;
+  }
+
+  if (node->M > 0) {
+    node->COM /= node->M;
+  }
 }
 
 void findForce(const Node* root,
@@ -265,7 +348,8 @@ BarnesHut::BarnesHut(const std::vector<Vec3>& state,
                      float G,
                      float softeningLength,
                      float theta,
-                     bool includeQuadrupole)
+                     bool includeQuadrupole,
+                     bool useZOrdering)
     : N(int(masses.size())),
       externalField(externalField),
       externalPotential(externalPotential),
@@ -275,7 +359,8 @@ BarnesHut::BarnesHut(const std::vector<Vec3>& state,
       G(G),
       eps(softeningLength),
       theta(theta),
-      includeQuadrupole(includeQuadrupole) {
+      includeQuadrupole(includeQuadrupole),
+      useZOrdering(useZOrdering) {
   for (int i = 0; i < N; ++i) {
     this->particles.emplace_back(state[i], state[N + i], masses[i]);
   }
@@ -326,6 +411,10 @@ void BarnesHut::run(StateRecorder& stateRecorder,
   stateRecorder.flush();
 }
 
+double BarnesHut::getTreeConstructionSecs() {
+  return treeConstructionSeconds;
+}
+
 void BarnesHut::clearAccelerations() {
   std::for_each(std::execution::par, particles.begin(), particles.end(),
                 [](Particle& p) { p.acceleration = Vec3::zero(); });
@@ -341,7 +430,12 @@ void BarnesHut::calculateAccelerations(const Tree& tree) {
 
 void BarnesHut::doStep() {
   clearAccelerations();
-  Tree tree(particles, low, H);
+  auto start = std::chrono::high_resolution_clock::now();
+  Tree tree(particles, low, H, useZOrdering);
+  auto end = std::chrono::high_resolution_clock::now();
+  treeConstructionSeconds += std::chrono::duration<double>(end - start).count();
+
+  calcCOM(tree.root);
   if (includeQuadrupole) {
     calcQ(tree.root);
   }
