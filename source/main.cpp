@@ -49,8 +49,17 @@ void handleOptions(int argc, char* argv[]) {
       {"galaxy-sim-pm", [&]() { galaxySimulationPM(arg2); }},
       {"galaxy-sim-p3m", [&]() { galaxySimulationP3M(arg2); }},
       {"galaxy-sim-bh", [&]() { galaxySimulationBH(arg2); }},
+      {"cluster-sim-pm", [&]() { plummerPM(arg2); }},
+#ifndef CUDA
+      {"cluster-sim-p3m", [&]() { plummerP3M(arg2); }},
+#endif
       {"cluster-sim-bh", [&]() { plummerBH(arg2); }},
-      {"galaxy-collision-sim-bh", [&]() { galaxyCollisionBH(arg2); }}};
+      {"galaxy-collision-sim-bh", [&]() { galaxyCollisionBH(arg2); }},
+      {"galaxy-collision-sim-pm", [&]() { galaxyCollisionPM(arg2); }},
+#ifndef CUDA
+      {"galaxy-collision-sim-p3m", [&]() { galaxyCollisionP3M(arg2); }}
+#endif
+  };
 
   auto it = optionHandlers.find(option);
   if (it != optionHandlers.end()) {
@@ -68,5 +77,6 @@ int main(int argc, char* argv[]) {
     handleOptions(argc, argv);
   } catch (const std::exception& e) {
     std::cerr << e.what() << '\n';
+    return 1;
   }
 }

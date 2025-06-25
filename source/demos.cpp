@@ -776,6 +776,124 @@ void galaxySimulationPM(const char* outputDir) {
   pm.run(stateRecorder, simLength, true /*diagnostics*/);
 }
 
+void galaxySimulationPMTiming(const char* outputDir) {
+  /*
+    units:
+    [M] = G(solar mass)
+    [L] = kpc
+    [T] = Myr
+    */
+  for (int n = 10'000; n <= 50'000; n += 5'000) {
+    Vec3 galaxyCenter = Vec3(30, 30, 15);
+    float rb = 3.0f;
+    float mb = 60.0f;
+    float rd = 15.0f;
+    float md = 15.0f;
+    float thickness = 0.3f;
+    float G = 4.5e-3f;
+    int simLength = 100;
+
+    DiskSamplerLinear diskSampler(42);
+    std::vector<Vec3> state = diskSampler.sample(galaxyCenter, rb, mb, rd, md, thickness, G, n);
+
+    std::vector<float> masses(n, md / n);
+    auto externalField = [galaxyCenter, rb, mb, G](Vec3 pos) -> Vec3 {
+      return sphRadDecrField(pos, galaxyCenter, rb, mb, G);
+    };
+    auto externalPotential = [galaxyCenter, rb, mb, G](Vec3 pos) -> float {
+      return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
+    };
+
+    auto gridPoints = std::make_tuple(128, 128, 64);
+    std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                               std::get<0>(gridPoints)};
+    auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
+    float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
+    float DT = 1;
+
+#ifdef CUDA
+    PMMethodGPU pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+                   InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
+                   GreensFunction::DISCRETE_LAPLACIAN, 0, gridPoints);
+#else
+    FFTWAdapter fftAdapter(dims);
+    Grid grid(gridPoints, fftAdapter);
+    PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+                InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
+                GreensFunction::DISCRETE_LAPLACIAN, 0, grid);
+#endif
+    StateRecorder stateRecorder(n, simLength + 1, outputDir);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    pm.run(stateRecorder, simLength, true /*diagnostics*/);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+
+    std::cout << n << ' ' << elapsed.count() << std::endl;
+  }
+}
+
+void galaxyCollisionPM(const char* outputDir) {
+  Vec3 galaxyCenter1 = Vec3(40, 30, 15);
+  Vec3 galaxyCenter2 = Vec3(80, 30, 15);
+  float rb = 3.0f;
+  float mb = 60.0f;
+  float rd = 15.0f;
+  float md = 15.0f;
+  float thickness = 0.3f;
+  float G = 4.5e-3f;
+  int n = int(3e4);
+  int simLength = 400;
+
+  DiskSamplerLinear diskSampler(42);
+  std::vector<Vec3> state1 = diskSampler.sample(galaxyCenter1, rb, mb, rd, md, thickness, G, n, rb);
+  std::vector<float> masses1(n, md / n);
+  state1[0] = galaxyCenter1;
+  state1[n] = Vec3::zero();
+  masses1[0] = 60.0f;
+
+  std::vector<Vec3> state2 = diskSampler.sample(galaxyCenter2, rb / 1.5f, mb / 1.5f, rd / 1.5f,
+                                                md / 1.5f, thickness, G, n, rb / 1.5f);
+  std::vector<float> masses2(n, md / n);
+  state2[0] = galaxyCenter2;
+  state2[n] = Vec3::zero();
+  masses2[0] = 60.0f / 1.5f;
+
+  std::vector<Vec3> state(4 * n);
+  std::vector<float> masses(2 * n);
+  for (int i = 0; i < n; ++i) {
+    state[i] = state1[i];
+    state[i + 2 * n] = state1[i + n];
+    masses[i] = masses1[i];
+  }
+  for (int i = 0; i < n; ++i) {
+    state[i + n] = state2[i];
+    state[i + 3 * n] = state2[i + n];
+    masses[i + n] = masses2[i];
+  }
+
+  auto externalField = [](Vec3 pos) -> Vec3 { return Vec3::zero(); };
+  auto externalPotential = [](Vec3 pos) -> float { return 0; };
+
+  auto gridPoints = std::make_tuple(128, 128, 64);
+  std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                             std::get<0>(gridPoints)};
+  auto effectiveBoxSize = std::make_tuple(120.0f, 120.0f, 60.0f);
+  float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
+  float DT = 1;
+
+  FFTWAdapter fftAdapter(dims);
+  Grid grid(gridPoints, fftAdapter);
+  PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
+              GreensFunction::DISCRETE_LAPLACIAN, 0, grid);
+
+  StateRecorder stateRecorder(2 * n, simLength + 1, outputDir);
+  pm.run(stateRecorder, simLength, true /*diagnostics*/);
+}
+
 void galaxySimulationP3M(const char* outputDir) {
   /*
     units:
@@ -832,6 +950,135 @@ void galaxySimulationP3M(const char* outputDir) {
   p3m.run(stateRecorder, simLength, true /*diagnostics*/);
 }
 
+void galaxySimulationP3MTiming(const char* outputDir) {
+  /*
+    units:
+    [M] = G(solar mass)
+    [L] = kpc
+    [T] = Myr
+    */
+  for (int n = 10'000; n <= 50'000; n += 5'000) {
+    Vec3 galaxyCenter = Vec3(30, 30, 15);
+    float rb = 3.0f;
+    float mb = 60.0f;
+    float rd = 15.0f;
+    float md = 15.0f;
+    float thickness = 0.3f;
+    float G = 4.5e-3f;
+    int simLength = 25;
+
+    DiskSamplerLinear diskSampler(42);
+    std::vector<Vec3> state = diskSampler.sample(galaxyCenter, rb, mb, rd, md, thickness, G, n);
+
+    std::vector<float> masses(n, md / n);
+    auto externalField = [galaxyCenter, rb, mb, G](Vec3 pos) -> Vec3 {
+      return sphRadDecrField(pos, galaxyCenter, rb, mb, G);
+    };
+    auto externalPotential = [galaxyCenter, rb, mb, G](Vec3 pos) -> float {
+      return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
+    };
+
+    auto gridPoints = std::make_tuple(128, 128, 64);
+    std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                               std::get<0>(gridPoints)};
+    FFTWAdapter fftAdapter(dims);
+    Grid grid(gridPoints, fftAdapter);
+    auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 30.0f);
+    float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
+    float DT = 1;
+    float a = 3 * H;
+
+#ifdef CUDA
+    PMMethodGPU pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+                   InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
+                   GreensFunction::DISCRETE_LAPLACIAN, 0, gridPoints);
+#else
+    PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+                InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL,
+                a, grid);
+#endif
+
+    float re = 0.7f * a;
+    float softeningLength = 1.5f;
+    P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S1);
+
+    StateRecorder stateRecorder(n, simLength + 1, outputDir);
+    auto start = std::chrono::high_resolution_clock::now();
+
+    p3m.run(stateRecorder, simLength, true /*diagnostics*/);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+
+    std::cout << n << ' ' << elapsed.count() << std::endl;
+  }
+}
+
+#ifndef CUDA
+void galaxyCollisionP3M(const char* outputDir) {
+  Vec3 galaxyCenter1 = Vec3(40, 30, 15);
+  Vec3 galaxyCenter2 = Vec3(80, 30, 15);
+  float rb = 3.0f;
+  float mb = 60.0f;
+  float rd = 15.0f;
+  float md = 15.0f;
+  float thickness = 0.3f;
+  float G = 4.5e-3f;
+  int n = int(3e4);
+  int simLength = 400;
+
+  DiskSamplerLinear diskSampler(42);
+  std::vector<Vec3> state1 = diskSampler.sample(galaxyCenter1, rb, mb, rd, md, thickness, G, n, rb);
+  std::vector<float> masses1(n, md / n);
+  state1[0] = galaxyCenter1;
+  state1[n] = Vec3::zero();
+  masses1[0] = 60.0f;
+
+  std::vector<Vec3> state2 = diskSampler.sample(galaxyCenter2, rb / 1.5f, mb / 1.5f, rd / 1.5f,
+                                                md / 1.5f, thickness, G, n, rb / 1.5f);
+  std::vector<float> masses2(n, md / n);
+  state2[0] = galaxyCenter2;
+  state2[n] = Vec3::zero();
+  masses2[0] = 60.0f / 1.5f;
+
+  std::vector<Vec3> state(4 * n);
+  std::vector<float> masses(2 * n);
+  for (int i = 0; i < n; ++i) {
+    state[i] = state1[i];
+    state[i + 2 * n] = state1[i + n];
+    masses[i] = masses1[i];
+  }
+  for (int i = 0; i < n; ++i) {
+    state[i + n] = state2[i];
+    state[i + 3 * n] = state2[i + n];
+    masses[i + n] = masses2[i];
+  }
+
+  auto externalField = [](Vec3 pos) -> Vec3 { return Vec3::zero(); };
+  auto externalPotential = [](Vec3 pos) -> float { return 0; };
+
+  auto gridPoints = std::make_tuple(128, 128, 64);
+  std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                             std::get<0>(gridPoints)};
+  auto effectiveBoxSize = std::make_tuple(120.0f, 120.0f, 60.0f);
+  float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
+  float DT = 1;
+  float a = 3 * H;
+
+  FFTWAdapter fftAdapter(dims);
+  Grid grid(gridPoints, fftAdapter);
+  PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL, a,
+              grid);
+
+  float re = 0.7f * a;
+  float softeningLength = 1.5f;
+  P3MMethod p3m(pm, effectiveBoxSize, re, a, H, softeningLength, CloudShape::S1);
+  StateRecorder stateRecorder(2 * n, simLength + 1, outputDir);
+  p3m.run(stateRecorder, simLength, true /*diagnostics*/);
+}
+#endif
+
 void galaxySimulationBH(const char* outputDir) {
   Vec3 galaxyCenter = Vec3(30, 30, 15);
   float rb = 3.0f;
@@ -856,7 +1103,7 @@ void galaxySimulationBH(const char* outputDir) {
   Vec3 low(0, 0, 0);
   float H = 60;
   float DT = 1;
-  float softeningLength = 1.5f;
+  float softeningLength = 1.0f;
   float theta = 1.0f;
 
   BH::BarnesHut bhSimulation(state, masses, externalField, externalPotential, low, H, G,
@@ -864,6 +1111,48 @@ void galaxySimulationBH(const char* outputDir) {
 
   StateRecorder stateRecorder(n, simLength + 1, outputDir);
   bhSimulation.run(stateRecorder, simLength, DT, true /*diagnostics*/);
+}
+
+void galaxySimulationBHTiming(const char* outputDir) {
+  for (int n = 10'000; n <= 50'000; n += 5'000) {
+    Vec3 galaxyCenter = Vec3(30, 30, 15);
+    float rb = 3.0f;
+    float mb = 60.0f;
+    float rd = 15.0f;
+    float md = 15.0f;
+    float thickness = 0.3f;
+    float G = 4.5e-3f;
+    int simLength = 100;
+
+    DiskSamplerLinear diskSampler(42);
+    std::vector<Vec3> state = diskSampler.sample(galaxyCenter, rb, mb, rd, md, thickness, G, n);
+    std::vector<float> masses(n, md / n);
+    auto externalField = [galaxyCenter, rb, mb, G](Vec3 pos) -> Vec3 {
+      return sphRadDecrField(pos, galaxyCenter, rb, mb, G);
+    };
+    auto externalPotential = [galaxyCenter, rb, mb, G](Vec3 pos) -> float {
+      return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
+    };
+
+    Vec3 low(0, 0, 0);
+    float H = 60;
+    float DT = 1;
+    float softeningLength = 1.0f;
+    float theta = 1.0f;
+
+    BH::BarnesHut bhSimulation(state, masses, externalField, externalPotential, low, H, G,
+                               softeningLength, theta, false, true);
+
+    StateRecorder stateRecorder(n, simLength + 1, outputDir);
+    auto start = std::chrono::high_resolution_clock::now();
+
+    bhSimulation.run(stateRecorder, simLength, DT, true /*diagnostics*/);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+
+    std::cout << n << ' ' << elapsed.count() << std::endl;
+  }
 }
 
 void bhZOrder(const char* outputDir) {
@@ -1032,18 +1321,24 @@ void galaxyCollisionBH(const char* outputDir) {
   Vec3 low(0, 0, 0);
   float H = 120;
   float DT = 1;
-  int simLength = 200;
+  int simLength = 400;
   float softeningLength = 1.3f;
   float theta = 1.0f;
 
   BH::BarnesHut bhSimulation(state, masses, externalField, externalPotential, low, H, G,
-                             softeningLength, theta);
+                             softeningLength, theta, true);
 
   StateRecorder stateRecorder(2 * n, simLength + 1, outputDir);
   bhSimulation.run(stateRecorder, simLength, DT, true /*diagnostics*/);
 }
 
 void plummerBH(const char* outputDir) {
+  /*
+  units:
+  [M] = M(solar mass)
+  [L] = pc
+  [T] = kyr
+  */
   Vec3 clusterCenter = Vec3(30, 30, 30);
   float a = 2;
   float rMax = 15;
@@ -1065,8 +1360,131 @@ void plummerBH(const char* outputDir) {
   float theta = 0.5f;
 
   BH::BarnesHut bhSimulation(state, masses, externalField, externalPotential, low, H, G,
-                             softeningLength, theta);
+                             softeningLength, theta, true);
 
   StateRecorder stateRecorder(n, simLength + 1, outputDir);
   bhSimulation.run(stateRecorder, simLength, DT, true /*diagnostics*/);
+}
+
+void plummerPM(const char* outputDir) {
+  /*
+  units:
+  [M] = M(solar mass)
+  [L] = pc
+  [T] = kyr
+  */
+  Vec3 clusterCenter = Vec3(30, 30, 30);
+  float a = 2;
+  float rMax = 15;
+  float M = 1.0f;
+  float G = 4.5e-3f;
+  int n = int(1e4);
+
+  PlummerSampler sampler(42);
+  std::vector<Vec3> state = sampler.sample(clusterCenter, a, rMax, M, G, n);
+  std::vector<float> masses(n, M / n);
+  auto externalField = [](Vec3 pos) -> Vec3 { return Vec3::zero(); };
+  auto externalPotential = [](Vec3 pos) -> float { return 0; };
+
+  int simLength = 200;
+
+  auto gridPoints = std::make_tuple(128, 128, 128);
+  std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                             std::get<0>(gridPoints)};
+  auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 60.0f);
+  float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
+  float DT = 1;
+
+  FFTWAdapter fftAdapter(dims);
+  Grid grid(gridPoints, fftAdapter);
+  PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT,
+              GreensFunction::DISCRETE_LAPLACIAN, 0, grid);
+
+  StateRecorder stateRecorder(n, simLength + 1, outputDir);
+  pm.run(stateRecorder, simLength, true /*diagnostics*/);
+}
+
+#ifndef CUDA
+void plummerP3M(const char* outputDir) {
+  /*
+  units:
+  [M] = M(solar mass)
+  [L] = pc
+  [T] = kyr
+  */
+  Vec3 clusterCenter = Vec3(30, 30, 30);
+  float a = 2;
+  float rMax = 15;
+  float M = 1.0f;
+  float G = 4.5e-3f;
+  int n = int(1e4);
+
+  PlummerSampler sampler(42);
+  std::vector<Vec3> state = sampler.sample(clusterCenter, a, rMax, M, G, n);
+  std::vector<float> masses(n, M / n);
+  auto externalField = [](Vec3 pos) -> Vec3 { return Vec3::zero(); };
+  auto externalPotential = [](Vec3 pos) -> float { return 0; };
+
+  int simLength = 200;
+
+  auto gridPoints = std::make_tuple(128, 128, 128);
+  std::array<int, 3> dims = {std::get<2>(gridPoints), std::get<1>(gridPoints),
+                             std::get<0>(gridPoints)};
+  auto effectiveBoxSize = std::make_tuple(60.0f, 60.0f, 60.0f);
+  float H = std::get<0>(effectiveBoxSize) / (std::get<0>(gridPoints) / 2);
+  float DT = 1;
+  float particleDiam = 3 * H;
+
+  FFTWAdapter fftAdapter(dims);
+  Grid grid(gridPoints, fftAdapter);
+  PMMethod pm(state, masses, effectiveBoxSize, externalField, externalPotential, H, DT, G,
+              InterpolationScheme::TSC, FiniteDiffScheme::TWO_POINT, GreensFunction::S1_OPTIMAL,
+              particleDiam, grid);
+
+  float re = 0.7f * a;
+  float softeningLength = 0.5f;
+  P3MMethod p3m(pm, effectiveBoxSize, re, particleDiam, H, softeningLength, CloudShape::S1);
+
+  StateRecorder stateRecorder(n, simLength + 1, outputDir);
+  pm.run(stateRecorder, simLength, true /*diagnostics*/);
+}
+#endif
+
+void galaxySimulationPPTiming(const char* outputDir) {
+  for (int n = 1000; n <= 5000; n += 500) {
+    Vec3 galaxyCenter = Vec3(30, 30, 15);
+    float rb = 3.0f;
+    float mb = 60.0f;
+    float rd = 15.0f;
+    float md = 15.0f;
+    float thickness = 0.3f;
+    float G = 4.5e-3f;
+    int simLength = 100;
+
+    DiskSamplerLinear diskSampler(42);
+    std::vector<Vec3> state = diskSampler.sample(galaxyCenter, rb, mb, rd, md, thickness, G, n);
+    std::vector<float> masses(n, md / n);
+    auto externalField = [galaxyCenter, rb, mb, G](Vec3 pos) -> Vec3 {
+      return sphRadDecrField(pos, galaxyCenter, rb, mb, G);
+    };
+    auto externalPotential = [galaxyCenter, rb, mb, G](Vec3 pos) -> float {
+      return sphRadDecrFieldPotential(pos, galaxyCenter, rb, mb, G);
+    };
+
+    float DT = 1;
+    float theta = 1.0f;
+    float eps = 1.0f;
+
+    StateRecorder stateRecorder(n, simLength + 1, outputDir);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    ppMethodLeapfrog(state, masses, simLength, DT, G, eps, stateRecorder, false);
+
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+
+    std::cout << n << ' ' << elapsed.count() << std::endl;
+  }
 }

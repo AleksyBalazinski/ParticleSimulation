@@ -153,14 +153,14 @@ void P3MMethod::run(StateRecorder& stateRecorder,
     updateVelocities(particles);
   }
 
-  // printTime(chainingMeshSetup);
-  // printTime(shortRangeForcesCalc);
-  // printTime(pmStep);
-  // printTime(correctAccelerations);
+  printTime(chainingMeshSetup);
+  printTime(shortRangeForcesCalc);
+  printTime(pmStep);
+  printTime(correctAccelerations);
 
-  // for (int i = 0; i < 12; ++i) {
-  //   std::cout << "thread " << i << " was working for " << threadTimes[i] << " ms\n";
-  // }
+  for (int i = 0; i < threadTimes.size(); ++i) {
+    std::cout << "thread " << i << " was working for " << threadTimes[i] << " ms\n";
+  }
 
   stateRecorder.flush();
 }

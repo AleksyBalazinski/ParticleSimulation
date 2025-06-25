@@ -8,49 +8,28 @@ For other platforms [kissfft](https://github.com/mborgerding/kissfft) can be use
 ```bash
 mkdir build; cd build
 cmake ..
-cmake --build .
+cmake --build . --config Release
 ```
 
 ## Test
 ```bash
+cd build
 ctest
 ```
 
-## Output viewing
-### 3D
+## Running a demo simulation
 ```bash
-python script/animate.py <output file path>
-```
-For example (MSVC in Debug mode):
-```bash
-python script/animate.py build/source/Debug/output.txt
-```
-### 2D
-```bash
-python script/animate2d.py <output file path>
-```
-For example (MSVC in Debug mode):
-```bash
-python script/animate2d.py build/source/Debug/output.txt
+./run_simulation.ps1 <sim-name>
 ```
 
-### Final positions
+## Recreating the results in the thesis
 ```bash
-python script/show_last.py <output file path>
-```
-For example (MSVC in Debug mode):
-```bash
-python script/show_last.py build/source/Debug/output.txt
+./create_plots.ps1
 ```
 
-## Total energy & momentum plots
-```bash
-python script/conserved_quantities.py <energy file path> <angular momentum file path> <momentum file path> <expected momentum file path>
-```
-For example (MSVC in Debug mode):
-```bash
-python script/conserved_quantities.py build/source/Debug/energy.txt build/source/Debug/angular_momentum.txt build/source/Debug/momentum.txt ./build/source/Debug/expected_momentum.txt
-```
+### Running CUDA implementation of the PM method
+Set `USE_CUDA` option to `ON` during configuration.
+
 ## Results
 ### Spiral galaxy simulation
 ![alt text](results/image.png)

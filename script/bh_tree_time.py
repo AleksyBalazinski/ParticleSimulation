@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Load data
-z_order_data = np.loadtxt('bh_time_z_order.txt')
-standard_data = np.loadtxt('bh_time_standard.txt')
+z_order_data = np.loadtxt('bh_tree_z_order.txt')
+standard_data = np.loadtxt('bh_tree_standard.txt')
 
 # Scale particle numbers by 10,000
 scale_factor = 10000
@@ -17,9 +17,9 @@ plt.plot(z_order_particles, z_order_time, 's--', label='Z-order BH', color='gree
 plt.plot(standard_particles, standard_time, 'o-', label='Standard BH', color='blue')
 
 # Labels and title
-plt.title('Barnes-Hut Simulation Runtime per Iteration')
-plt.xlabel(r'$N$ ($\times 10^4$ particles)')
-plt.ylabel('Average Time per Iteration (milliseconds)')
+plt.title('Tree Construction Time vs Particle Number')
+plt.xlabel(r'Number of Particles ($\times 10^4$)')
+plt.ylabel('Time (milliseconds)')
 plt.legend()
 plt.grid(True)
 plt.tight_layout()

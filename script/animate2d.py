@@ -39,7 +39,7 @@ def update(frame_num):
     ax.set_aspect('equal', adjustable='box')
     ax.set_xlabel('x (kpc)')
     ax.set_ylabel('y (kpc)')
-    ax.text(50, 50, f'Time: {frame_num * time_step} Myr', fontsize=10, bbox=dict(facecolor='white', alpha=0.4))
+    ax.text(45, 55, f'Time: {frame_num * time_step} Myr', fontsize=10, bbox=dict(facecolor='white', alpha=0.4))
 
     particles = frames[frame_num]
     total_particles = len(particles)

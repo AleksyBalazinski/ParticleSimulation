@@ -2,9 +2,19 @@
 
 void galaxySimulationPM(const char* outputDir);
 
+void galaxySimulationPMTiming(const char* outputDir);
+
+void galaxyCollisionPM(const char* outputDir);
+
 void galaxySimulationP3M(const char* outputDir);
 
+void galaxySimulationP3MTiming(const char* outputDir);
+
+void galaxyCollisionP3M(const char* outputDir);
+
 void galaxySimulationBH(const char* outputDir);
+
+void galaxySimulationBHTiming(const char* outputDir);
 
 void anisotropy(const char* outputDir);
 
@@ -31,4 +41,12 @@ void bhAccuracy(const char* outputDir);
 
 void plummerBH(const char* outputDir);
 
+void plummerPM(const char* outputDir);
+
+#ifndef CUDA
+void plummerP3M(const char* outputDir);
+#endif
+
 void galaxyCollisionBH(const char* outputDir);
+
+void galaxySimulationPPTiming(const char* outputDir);

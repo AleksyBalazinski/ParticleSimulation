@@ -14,6 +14,6 @@ TEST(barnesHut, tree) {
 
   Vec3 low(0, 0, 0);
   float H = 10;
-  Tree tree(particles, low, H);
+  Tree tree(particles, low, H, false);
   tree.print();
 }
